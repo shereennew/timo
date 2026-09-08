@@ -2,23 +2,23 @@
 .dashboard {
   --accent: #d8c4ef; --accent-dark: #62427e; --soft: #f5eefc;
   --border: #e7d9f3; --muted: #6e6278; --ink: #30203e;
-  --chart-1: #bea2df; --chart-2: #d6bae9; --chart-3: #edc5de;
+  --chart-1: #9b72cf; --chart-2: #64b6ac; --chart-3: #f1bbba;
   color: var(--ink);
 }
 .dashboard[data-theme="pink"] {
   --accent: #f3c4d8; --accent-dark: #843e5c; --soft: #fff0f5;
   --border: #f1d8e2; --muted: #79616c; --ink: #422532;
-  --chart-1: #f3c4d8; --chart-2: #eeb2cc; --chart-3: #f4cabb;
+  --chart-1: #d87093; --chart-2: #64b6ac; --chart-3: #f4cabb;
 }
 .dashboard[data-theme="blue"] {
   --accent: #bdddf5; --accent-dark: #365e7c; --soft: #eef7fd;
   --border: #d6e8f4; --muted: #596d80; --ink: #23364a;
-  --chart-1: #bdddf5; --chart-2: #a8c9eb; --chart-3: #b9e3e5;
+  --chart-1: #5c93df; --chart-2: #52b788; --chart-3: #f2a65a;
 }
 .dashboard[data-theme="green"] {
   --accent: #c5e4cd; --accent-dark: #3a6447; --soft: #eff8ee;
   --border: #d8e9d7; --muted: #5c7063; --ink: #253c2f;
-  --chart-1: #c5e4cd; --chart-2: #a9d0b5; --chart-3: #d6e6b6;
+  --chart-1: #40916c; --chart-2: #52b788; --chart-3: #e09f3e;
 }
 .dashboard { width: min(100% - 40px, 520px); margin: 0 auto; padding: 28px 0 24px; }
 .topbar, .brand, .card-heading, .section-heading, .load-row { display: flex; align-items: center; }
@@ -75,7 +75,6 @@ footer { text-align: center; font-size: 12px; color: var(--muted); margin-top: 2
 .brand-text { display: flex; flex-direction: column; font-size: 25px; line-height: 1.1; }
 .brand-meaning { font-size: 12px; font-weight: 500; letter-spacing: .3px; color: var(--muted); margin-top: 4px; }
 
-
 .appearance-settings { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 16px; color: var(--muted); font-size: 14px; }
 .appearance-settings summary { cursor: pointer; padding: 8px 0; font-weight: 600; }
 .appearance-settings summary:focus-visible { outline: 3px solid var(--accent-dark); outline-offset: 3px; border-radius: 4px; }
@@ -86,7 +85,6 @@ footer { text-align: center; font-size: 12px; color: var(--muted); margin-top: 2
 .background-option:has(input:checked) { border-color: var(--accent-dark); background: var(--soft); color: var(--accent-dark); }
 .background-option input { accent-color: var(--accent-dark); margin: 0; }
 .background-swatch { width: 18px; height: 18px; border: 1px solid var(--border); border-radius: 50%; }
-
 
 .task-section { margin: 24px 0; padding: 20px; background: #fffdf5; border: 1px solid var(--border); border-radius: 18px; }
 .task-form { display: grid; gap: 12px; margin-top: 16px; }
@@ -135,4 +133,3 @@ footer { text-align: center; font-size: 12px; color: var(--muted); margin-top: 2
 .move-preview { background: var(--soft); padding: 10px 14px; border-radius: 12px; }
 .move-preview p { margin: 5px 0; }
 .suggestions .page-actions { margin: 16px 0 0; flex-wrap: wrap; }
-
