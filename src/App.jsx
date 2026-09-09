@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 import Calendar from './Calendar'
+import BottomNav from './BottomNav'
+import AICompanion from './AICompanion'
 
 import { dateKey, parseDate, validDate, tasksForDay, suggestMove } from './planning'
 
-// Demo points represent effort, not hours or a medical assessment.
-// Capacity is an estimate for planning based on daily mood check-in.
 const categories = [
   { name: 'Academic', detail: 'Classes & assignment', points: 5, color: 'var(--chart-1)', icon: 'A' },
   { name: 'Work', detail: 'Part-time shift', points: 3, color: 'var(--chart-2)', icon: 'W' },
@@ -158,101 +158,21 @@ function App() {
   const date = parseDate(selectedDate).toLocaleDateString('en', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })
 
   return (
-    <main className="dashboard" data-theme={theme}>
+    <main className="dashboard" data-theme={theme} style={{ paddingBottom: '6rem' }}>
       <header className="topbar">
-        <span className="brand"><span className="brand-mark" aria-hidden="true">t.</span><span className="brand-text">timö<span className="brand-meaning">tiny moments</span></span></span>
-        
-        <div>
-          {page === 'dashboard' ? (
-            <button 
-              className="demo-label" 
-              onClick={() => navigate('calendar')} 
-              style={{ 
-                cursor: 'pointer', 
-                background: 'linear-gradient(135deg, #7c529e, #9b6fe6)', 
-                color: '#ffffff',
-                border: '2px solid rgba(255, 255, 255, 0.4)',
-                fontWeight: 700,
-                fontSize: '0.9rem',
-                padding: '9px 18px',
-                borderRadius: '24px',
-                boxShadow: '0 6px 16px rgba(123, 82, 158, 0.35)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s ease',
-                outline: 'none'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-1px)'
-                e.currentTarget.style.boxShadow = '0 8px 20px rgba(123, 82, 158, 0.5)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(123, 82, 158, 0.35)'
-              }}
-            >
-              <span>Switch View</span>
-              <span style={{ 
-                background: 'rgba(255, 255, 255, 0.25)', 
-                padding: '2px 8px', 
-                borderRadius: '12px', 
-                fontSize: '0.75rem',
-                marginLeft: '2px',
-                letterSpacing: '0.3px'
-              }}>
-                Calendar ▾
-              </span>
-            </button>
-          ) : (
-            <button 
-              className="demo-label" 
-              onClick={() => navigate('dashboard')} 
-              style={{ 
-                cursor: 'pointer', 
-                background: 'linear-gradient(135deg, #7c529e, #9b6fe6)', 
-                color: '#ffffff',
-                border: '2px solid rgba(255, 255, 255, 0.4)',
-                fontWeight: 700,
-                fontSize: '0.9rem',
-                padding: '9px 18px',
-                borderRadius: '24px',
-                boxShadow: '0 6px 16px rgba(123, 82, 158, 0.35)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                transition: 'all 0.2s ease',
-                outline: 'none'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-1px)'
-                e.currentTarget.style.boxShadow = '0 8px 20px rgba(123, 82, 158, 0.5)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(123, 82, 158, 0.35)'
-              }}
-            >
-              <span>Back to</span>
-              <span style={{ 
-                background: 'rgba(255, 255, 255, 0.25)', 
-                padding: '2px 8px', 
-                borderRadius: '12px', 
-                fontSize: '0.75rem',
-                marginLeft: '2px',
-                letterSpacing: '0.3px'
-              }}>
-                Today ▴
-              </span>
-            </button>
-          )}
-        </div>
+        <span className="brand">
+          <span className="brand-mark" aria-hidden="true">t.</span>
+          <span className="brand-text">timö<span className="brand-meaning">tiny moments</span></span>
+        </span>
       </header>
 
       {page === 'calendar' && <>
         <div className="intro"><h1>Pick a day</h1><p>Tap a date to see its load and tasks.</p></div>
-      <Calendar selectedDate={selectedDate} today={today} tasks={tasks} onSelect={day => { setSelectedDate(day); setMessage(''); setShowSuggestions(false); navigate('dashboard') }} />
+        <Calendar selectedDate={selectedDate} today={today} tasks={tasks} onSelect={day => { setSelectedDate(day); setMessage(''); setShowSuggestions(false); navigate('dashboard') }} />
       </>}
+
+      {page === 'companion' && <AICompanion />}
+
       {page === 'add-task' && <section className="task-section">
         <h1>Add a little task</h1>
         <p>Planning for {date}</p>
@@ -269,6 +189,7 @@ function App() {
         </form>
         <p className="helper" role="status">{message}</p>
       </section>}
+
       {page === 'dashboard' && <>
       <div className="intro">
         <p className="eyebrow">{date}</p>
@@ -297,7 +218,6 @@ function App() {
           </span>
         </div>
         
-        {/* Mood Feedback Section */}
         <div className="mood-feedback-container" style={{ margin: '1rem 0', textAlign: 'left' }}>
           <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem' }}>How are you feeling today?</label>
           <div className="mood-options" style={{ display: 'flex', gap: '0.75rem', justifyContent: 'space-between' }}>
@@ -325,7 +245,7 @@ function App() {
           </div>
         </div>
 
-        <div className="capacity-donut" style={{ background: donutBackground }} role="img" aria-label={`${totalLoad} points planned against ${dailyCapacity} points of capacity. ${loads.map(load => `${load.name}: ${load.points} points`).join('. ')}. ${overload > 0 ? `${overload} points over capacity` : `${dailyCapacity - totalLoad} points available`}.`}>
+        <div className="capacity-donut" style={{ background: donutBackground }} role="img" aria-label={`${totalLoad} points planned against ${dailyCapacity} points of capacity.`}>
           <div className="donut-center" aria-hidden="test">
             <div className="capacity-number">{totalLoad}<span> / {dailyCapacity}</span></div>
             <p className="capacity-caption">points planned</p>
@@ -340,7 +260,6 @@ function App() {
           ))}
         </div>
 
-        {/* Note box moved to the very bottom of the card */}
         <p className="capacity-note" style={{
           background: overload > 0 ? '#fdf2f2' : 'var(--accent-light, rgba(216, 196, 239, 0.25))',
           color: overload > 0 ? '#9b2c2c' : 'var(--accent-dark, #4a325e)',
@@ -362,7 +281,6 @@ function App() {
         </p>
       </section>
 
-      {/* Add Task Button Placed Below Capacity Chart */}
       <nav className="page-actions" aria-label="Plan your day" style={{ margin: '1.5rem 0' }}>
         <button onClick={() => { setMessage(''); navigate('add-task') }} style={{ width: '100%' }}>+ Add task</button>
       </nav>
@@ -428,14 +346,15 @@ function App() {
             <p>New day: <strong>{suggestion.destinationBefore} → {suggestion.destinationAfter} pts</strong></p>
           </div>
           <p>{suggestion.remaining === 0 ? 'This brings both days within your estimated capacity.' : `This frees up ${suggestion.task.points} points, leaving ${suggestion.remaining} points above your estimate on this day.`}</p>
-          <p className="helper">Chosen from the next 7 days to ease this day without overloading another. Check that the task can wait: deadlines and fixed commitments are not recorded yet.</p>
+          <p className="helper">Chosen from the next 7 days to ease this day without overloading another.</p>
           <div className="page-actions">
             <button type="button" onClick={() => setShowSuggestions(false)}>Keep my plan</button>
             <button type="button" onClick={acceptSuggestion}>Yes, move task</button>
           </div>
-        </> : <p>{selectedDate < today ? 'This is a past day. Choose today or a future date to adjust your plan.' : overload === 0 ? 'Your plan is within your estimated capacity. Keep some room for breaks.' : 'No task fits within the estimated capacity of the next 7 days. Try splitting a larger task or use Trade task to choose a later date.'}</p>}
+        </> : <p>{selectedDate < today ? 'This is a past day. Choose today or a future date to adjust your plan.' : overload === 0 ? 'Your plan is within your estimated capacity. Keep some room for breaks.' : 'No task fits within the estimated capacity of the next 7 days.'}</p>}
       </section>
       </>}
+
       <details className="appearance-settings">
         <summary>Appearance</summary>
         <fieldset>
@@ -463,7 +382,10 @@ function App() {
           </div>
         </fieldset>
       </details>
+
       <footer>Tasks stay in this browser · Load points are a planning aid.</footer>
+
+      <BottomNav page={page} navigate={navigate} />
     </main>
   )
 }
