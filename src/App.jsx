@@ -468,26 +468,33 @@ function App() {
   const [aiRecommendation, setAiRecommendation] = useState(null)
   const [showFlowchartWarning, setShowFlowchartWarning] = useState(false)
 
- useEffect(() => {
-    const userState = {
-      mentalFatigue: dayTasks.length > 3 || selectedMood === 'Stressed' || selectedMood === 'Anxious',
-      energyLevel: selectedMood,
-      upcomingTasks: dayTasks,
-    }
+  useEffect(() => {
+    const totalLoad = dayTasks.reduce((sum, task) => sum + Number(task.points), 0)
+    const overload = Math.max(0, totalLoad - dailyCapacity)
 
-    const evaluation = evaluateUserStatus(userState)
-    const scheduleCheck = processScheduleCheck(userState.upcomingTasks)
+    if (overload > 0) {
+      const userState = {
+        mentalFatigue: dayTasks.length > 3 || selectedMood === 'Stressed' || selectedMood === 'Anxious',
+        energyLevel: selectedMood,
+        upcomingTasks: dayTasks,
+      }
 
-    if (evaluation.recommendation) {
-      setAiRecommendation(evaluation.recommendation)
-      setShowFlowchartWarning(true)
-    } else if (scheduleCheck.suggestion) {
-      setAiRecommendation(scheduleCheck.suggestion)
-      setShowFlowchartWarning(true)
+      const evaluation = evaluateUserStatus(userState)
+      const scheduleCheck = processScheduleCheck(userState.upcomingTasks)
+
+      if (evaluation.recommendation) {
+        setAiRecommendation(evaluation.recommendation)
+        setShowFlowchartWarning(true)
+      } else if (scheduleCheck.suggestion) {
+        setAiRecommendation(scheduleCheck.suggestion)
+        setShowFlowchartWarning(true)
+      } else {
+        setShowFlowchartWarning(false)
+      }
     } else {
       setShowFlowchartWarning(false)
     }
-  }, [selectedMood, dayTasks])
+  }, [selectedMood, dayTasks, dailyCapacity])
 
   function saveTasks(nextTasks) {
     setTasks(nextTasks)
@@ -643,8 +650,8 @@ function App() {
           </div>
 
           {showFlowchartWarning && (
-            <section 
-              className="warning" 
+            <section
+              className="warning"
               aria-labelledby="flowchart-warning-title"
               style={{
                 background: 'var(--accent-light, #f4effa)',
@@ -657,8 +664,8 @@ function App() {
                 marginBottom: '1.5rem'
               }}
             >
-              <span 
-                className="warning-icon" 
+              <span
+                className="warning-icon"
                 aria-hidden="true"
                 style={{
                   background: 'var(--accent, #d8c4ef)',
@@ -780,12 +787,12 @@ function App() {
                   </button>
                 ))}
               </div>
-              <p 
-                style={{ 
-                  fontSize: '0.75rem', 
-                  color: 'var(--muted, #666)', 
-                  textAlign: 'center', 
-                  marginTop: '0.5rem', 
+              <p
+                style={{
+                  fontSize: '0.75rem',
+                  color: 'var(--muted, #666)',
+                  textAlign: 'center',
+                  marginTop: '0.5rem',
                   marginBottom: '0.8rem'
                 }}
               >
@@ -1022,32 +1029,6 @@ function App() {
               </ul>
             )}
           </section>
-
-          {overload > 0 && (
-            <section
-              className="warning"
-              aria-labelledby="warning-title"
-            >
-              <span
-                className="warning-icon"
-                aria-hidden="true"
-              >
-                !
-              </span>
-
-              <div>
-                <h2 id="warning-title">
-                  This day looks a little heavy
-                </h2>
-
-                <p>
-                  Your plans exceed the estimated capacity
-                  by {overload} points. Consider leaving some
-                  room in this day.
-                </p>
-              </div>
-            </section>
-          )}
 
           <button
             className="primary-button"

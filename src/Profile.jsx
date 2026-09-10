@@ -149,7 +149,7 @@ export default function Profile() {
 
           <div className="form-actions">
             <button type="submit" className="action-btn primary-action">
-              Save Account
+              Save
             </button>
             <button
               type="button"
@@ -208,7 +208,7 @@ export default function Profile() {
 
           <div className="form-actions">
             <button type="submit" className="primary-button">
-              Save Settings
+              Save
             </button>
             <button
               type="button"
