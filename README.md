@@ -33,11 +33,11 @@ The generated starter uses Oxlint for its `npm run lint` command.
 
 
 
-Timo by Git Push and Pray
-Team: Eryne Chuah Ee Wen, Shereen New Jia Ning, Chong Tze Xuen, Chieng Mee Hui
-Problem Statement: Stress & Workload Manager
-Video Presentation: [Unlisted Youtube Link] 
-Presentation Slides: [Public Link] 
+Timo by Git Push and Pray  
+Team: Eryne Chuah Ee Wen, Shereen New Jia Ning, Chong Tze Xuen, Chieng Mee Hui  
+Problem Statement: Stress & Workload Manager  
+Video Presentation: [Unlisted Youtube Link]   
+Presentation Slides: [Public Link]  
 
 1. Project Overview
 
