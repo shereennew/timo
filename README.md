@@ -60,6 +60,7 @@ Feature list:
 
 
 2. Ideation & Process
+
 2.1 Ideas We Considered
 Table of every distinct idea generated, with why each was kept or dropped, order it so that chosen ideas are listed first
 
@@ -97,12 +98,14 @@ Even if you disagreed with a piece of feedback, you can say so and explain why. 
 
 
 3. Design & Prototype
+   
 UI Prototype: [ Public Link ]
 Check that it opens in an incognito window. This can be a link to Figma, Canva, Netlify, Vercel or any other board where you showcase your UI. It can be clickable with hyperlinks or simply ordered screenshots.
 We recommend you embed or link 4–8 key screens as images, with a caption on each explaining the interaction
 
 
-4. What Makes It Different
+5. What Makes It Different
+
 | Novel Feature | What makes it different |
 | ------------- | ----------------------- |
 | Dynamic Energy Capacity | Instead of only tracking tasks, the app calculates the user's current capacity based on workload, available time, stress check-ins and recovery activities |
@@ -114,6 +117,7 @@ We recommend you embed or link 4–8 key screens as images, with a caption on ea
 Existing productivity apps mainly help users organize what they need to do. Our system goes further by considering what the user can realistically handle and actively adjusting their workload when their capacity decreases.
 
 5. Technical Architecture & Feasibility
+   
 Tech stack
 Tell us your frontend, backend, database, APIs and services, as well as how and where you will be hosting. For each, try to tell us why you chose that technology, and what constraints you expect to face (For example, you chose Supabase because it’s free but you’ll still need a proxy)
 
