@@ -525,7 +525,8 @@ h3 {
    ========================= */
 
 .ai-companion {
-  max-width: 650px; margin: 2rem auto 0 auto;
+  width: 100%;
+  margin: 0;
 }
 
 .ai-intro {
