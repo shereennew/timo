@@ -992,4 +992,26 @@ footer {
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--border, #e2dfec);
-}
+}.completion-toggle, .fixed-toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.completion-toggle input, .task-form .fixed-toggle input { width: 20px; height: 20px; min-height: 20px; flex-shrink: 0; accent-color: var(--accent-dark); }
+.task-undo { position: fixed; bottom: 84px; left: 50%; transform: translateX(-50%); width: min(calc(100% - 32px),480px); z-index: 1100; display: flex; align-items: center; gap: 10px; background: var(--accent); color: var(--accent-dark); padding: 12px; border-radius: 14px; box-shadow: 0 4px 20px #0002; }
+.task-undo span { flex: 1; }
+.task-undo button { font: inherit; min-height: 44px; padding: 8px 12px; border: 0; border-radius: 8px; background: var(--soft); color: var(--accent-dark); cursor: pointer; }
+.task-undo button:focus-visible { outline: 2px solid var(--accent-dark); outline-offset: 2px; }
+.priority-badge { display: inline-block; font-size: 12px; padding: 4px 8px; border-radius: 12px; font-weight: 700; text-transform: capitalize; }
+.priority-high { background: #fce0e5; color: #84334c; }
+.priority-medium { background: #fff0cc; color: #765714; }
+.priority-low { background: #e1f1e6; color: #356348; }
+.planner-navigation { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.planner-navigation label { flex: 1; display: grid; gap: 6px; font-size: 14px; }
+.planner-navigation input { width: 100%; min-width: 0; font: inherit; border: 1px solid var(--border); background: #fffdf5; color: var(--ink); padding: 10px; border-radius: 10px; }
+.planner-navigation button { min-width: 44px; min-height: 44px; font-size: 24px; border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-dark); cursor: pointer; }
+.planner-timeline { margin: 20px 0; border-left: 3px solid var(--accent); padding-left: 14px; }
+.planner-card { background: #fffdf5; border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin: 12px 0; overflow-wrap: anywhere; }
+.planner-time { color: var(--accent-dark); font-weight: 700; margin: 0; }
+.planner-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 14px; margin: 8px 0; }
+.planner-gap { display: flex; flex-wrap: wrap; gap: 10px; padding: 16px; color: var(--muted); font-size: 14px; }
+.planner-navigation button:focus-visible,.planner-navigation input:focus-visible { outline: 2px solid var(--accent-dark); outline-offset: 3px; }
+.daily-planner > h2:first-child { margin-top: 28px; color: var(--accent-dark); }
+.planner-date-controls { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 24px; }
+.planner-date-controls > h2 { margin-bottom: 16px; }

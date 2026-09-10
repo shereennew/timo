@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 import Calendar from './Calendar'
+import Planner from './Planner'
 import BottomNav from './BottomNav'
 import AICompanion from './AICompanion'
 import Profile from './Profile'
+import { addSampleWeek } from './sampleWeek'
 
-import { dateKey, parseDate, validDate, tasksForDay } from './planning'
+import { dateKey, parseDate, validDate, tasksForDay, migrateTask, conflicts, suggestMove } from './planning'
 
 const categories = [
   { name: 'Academic', detail: 'Classes & assignment', points: 5, color: 'var(--chart-1)', icon: 'A' },
@@ -38,115 +40,8 @@ const themes = {
    FLOWCHART AI LOGIC EVALUATOR
    ========================= */
 
-function evaluateUserStatus(userState) {
-  const { energyLevel, upcomingTasks } = userState
-
-  if (energyLevel === 'Stressed') {
-    return {
-      recommendation: "You're feeling stressed today. Let's take things slow—how about scheduling a longer break?",
-      action: 'check_schedule',
-      tasks: upcomingTasks,
-    }
-  }
-
-  if (energyLevel === 'Anxious') {
-    return {
-      recommendation: "Anxiety can feel really overwhelming. Would you like to lighten your load or take a mindful pause?",
-      action: 'check_schedule',
-      tasks: upcomingTasks,
-    }
-  }
-
-  if (energyLevel === 'Okay') {
-    return {
-      recommendation: "You're cruising at an okay pace. A short break or some light activity might feel nice soon!",
-      action: 'check_schedule',
-      tasks: upcomingTasks,
-    }
-  }
-
-  if (energyLevel === 'Good' || energyLevel === 'Great') {
-    return {
-      recommendation: "You're radiating good energy today! Keep up the great balance.",
-      action: 'continue',
-      tasks: upcomingTasks,
-    }
-  }
-
-  return {
-    recommendation: "Keeping an eye on your energy—you're doing great!",
-    action: 'continue',
-    tasks: upcomingTasks,
-  }
-}
-
-function processScheduleCheck(tasks) {
-  const hasTooManyTasks = tasks && tasks.length > 3
-
-  if (hasTooManyTasks) {
-    return {
-      suggestion: "Your schedule looks quite packed today. Want to shuffle a few things around so you don't burn out?",
-      nextStep: "Monitor user's status & energy",
-    }
-  }
-
-  return {
-    suggestion: "Your schedule is looking balanced and manageable.",
-    nextStep: "Monitor user's status & energy",
-  }
-}
-
-function suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today) {
-  if (selectedDate < today) return null
-
-  const currentTasks = tasksForDay(tasks, selectedDate)
-  const totalLoad = currentTasks.reduce((sum, task) => sum + Number(task.points), 0)
-
-  if (totalLoad <= dailyCapacity) return null
-
-  const flexibleTasks = currentTasks.filter(task => Number(task.points) < 3)
-  if (flexibleTasks.length === 0) return null
-
-  const candidate = [...flexibleTasks].sort(
-    (a, b) => Number(a.points) - Number(b.points)
-  )[0]
-
-  const remainingTasks = currentTasks.filter(task => task.id !== candidate.id)
-  const sourceAfter = remainingTasks.reduce(
-    (sum, task) => sum + Number(task.points),
-    0
-  )
-
-  for (let i = 1; i <= 7; i++) {
-    const destinationDate = parseDate(selectedDate)
-    destinationDate.setDate(destinationDate.getDate() + i)
-
-    const destination = dateKey(destinationDate)
-    const destinationTasks = tasksForDay(tasks, destination)
-    const destinationBefore = destinationTasks.reduce(
-      (sum, task) => sum + Number(task.points),
-      0
-    )
-    const destinationAfter = destinationBefore + Number(candidate.points)
-
-    if (destinationAfter <= dailyCapacity) {
-      return {
-        task: candidate,
-        destination,
-        sourceBefore: totalLoad,
-        sourceAfter,
-        destinationBefore,
-        destinationAfter,
-        remaining: Math.max(0, sourceAfter - dailyCapacity),
-      }
-    }
-  }
-
-  return null
-}
-
 function App() {
-  const [page, setPage] = useState('dashboard')
+  const [page, setPage] = useState('planner')
 
   function navigate(nextPage) {
     setPage(nextPage)
@@ -156,7 +51,10 @@ function App() {
   const today = dateKey(new Date())
 
   const [selectedDate, setSelectedDate] = useState(today)
-  const [selectedMood, setSelectedMood] = useState('Good')
+  const [moodHistory,setMoodHistory]=useState(()=>{try {const v=JSON.parse(localStorage.getItem('timo-moods')||'{}');return v&&typeof v==='object'?v:{}}catch{return {}}})
+  const selectedMood=moodHistory[selectedDate] || 'Okay'
+  const capacityForDay=day=>moods.find(m=>m.label===moodHistory[day])?.points || 8
+  function setSelectedMood(value){const next={...moodHistory,[today]:value};setMoodHistory(next);try{localStorage.setItem('timo-moods',JSON.stringify(next))}catch{setStorageError(true)}}
 
   const dailyCapacity =
     moods.find(m => m.label === selectedMood)?.points || 8
@@ -173,89 +71,13 @@ function App() {
               typeof task.id === 'string' &&
               typeof task.name === 'string' &&
               task.name.trim() &&
-              categories.some(c => c.name === task.category) &&
-              [1, 2, 3].includes(Number(task.points))
+              (categories.some(c => c.name === task.category) || task.category === 'Recovery') &&
+              [0, 1, 2, 3].includes(Number(task.points))
           )
-          .map(task => ({
-            ...task,
-            points: Number(task.points),
-            date: validDate(task.date) ? task.date : today,
-            startTime: task.startTime || '09:00',
-            endTime: task.endTime || '10:00',
-          }))
+          .map(task => migrateTask(task,today))
         : []
 
-      if (localStorage.getItem('timo-examples-v1') === 'added') {
-        return existing
-      }
-
-      const tomorrowDate = parseDate(today)
-      tomorrowDate.setDate(tomorrowDate.getDate() + 1)
-      const tomorrow = dateKey(tomorrowDate)
-
-      const examples = [
-        {
-          id: 'example-v1-1',
-          name: 'Read chapter 3',
-          category: 'Academic',
-          points: 2,
-          startTime: '09:00',
-          endTime: '10:00',
-          date: today,
-        },
-        {
-          id: 'example-v1-2',
-          name: 'Finish assignment draft',
-          category: 'Academic',
-          points: 3,
-          startTime: '10:00',
-          endTime: '12:00',
-          date: today,
-        },
-        {
-          id: 'example-v1-3',
-          name: 'Afternoon cafe shift',
-          category: 'Work',
-          points: 3,
-          startTime: '14:00',
-          endTime: '17:00',
-          date: today,
-        },
-        {
-          id: 'example-v1-4',
-          name: 'Catch up with a friend',
-          category: 'Social',
-          points: 1,
-          startTime: '18:00',
-          endTime: '19:00',
-          date: today,
-        },
-        {
-          id: 'example-v1-5',
-          name: 'Review lecture notes',
-          category: 'Academic',
-          points: 2,
-          startTime: '09:00',
-          endTime: '10:00',
-          date: tomorrow,
-        },
-        {
-          id: 'example-v1-6',
-          name: 'Study group catch-up',
-          category: 'Social',
-          points: 2,
-          startTime: '15:00',
-          endTime: '17:00',
-          date: tomorrow,
-        },
-      ]
-
-      return [
-        ...existing,
-        ...examples.filter(
-          example => !existing.some(task => task.id === example.id)
-        ),
-      ]
+      return localStorage.getItem('timo-sample-week-v2') === 'added' ? existing : addSampleWeek(existing,today)
     } catch {
       return []
     }
@@ -264,6 +86,7 @@ function App() {
   useEffect(() => {
     try {
       localStorage.setItem('timo-tasks', JSON.stringify(tasks))
+      if(tasks.some(t=>t.id.startsWith('sample-week-v2-'))) localStorage.setItem('timo-sample-week-v2','added')
 
       if (tasks.some(task => task.id.startsWith('example-v1-'))) {
         localStorage.setItem('timo-examples-v1', 'added')
@@ -290,6 +113,7 @@ function App() {
     event.preventDefault()
 
     if (!validDate(tradeDate) || tradeDate === task.date) return
+    if(task.fixed||task.done||(task.deadline&&tradeDate>task.deadline)||conflicts(tasks,{...task,date:tradeDate}).length){setMessage('Cannot move this task: fixed, completed, past deadline, or overlapping another plan.');return}
 
     saveTasks(
       tasks.map(item =>
@@ -309,9 +133,18 @@ function App() {
     setTradingTask(null)
   }
 
+  const [editingId,setEditingId]=useState(null)
+  const [deadline,setDeadline]=useState('')
+  const [fixed,setFixed]=useState(false)
+  const [undoSnapshot,setUndoSnapshot]=useState(null)
+  useEffect(()=>{if(!undoSnapshot)return;const timer=setTimeout(()=>setUndoSnapshot(null),8000);return()=>clearTimeout(timer)},[undoSnapshot])
+  function beginEdit(task){setEditingId(task.id);setTaskName(task.name);setCategory(task.category);setEffort(String(task.points));setPriority(task.priority||'medium');setStartTime(task.startTime||'');setEndTime(task.endTime||'');setDeadline(task.deadline||'');setFixed(!!task.fixed);setMessage('');navigate('add-task')}
+  function beginAdd(){setEditingId(null);setTaskName('');setCategory('Academic');setEffort('1');setPriority('medium');setStartTime('09:00');setEndTime('10:00');setDeadline('');setFixed(false);setMessage('');navigate('add-task')}
+  function undoChange(){if(!undoSnapshot)return;saveTasks(undoSnapshot);setUndoSnapshot(null);setTradingTask(null);setMessage('Last task change undone.')}
   const [taskName, setTaskName] = useState('')
   const [category, setCategory] = useState('Academic')
   const [effort, setEffort] = useState('1')
+  const [priority,setPriority]=useState('medium')
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime] = useState('10:00')
 
@@ -325,30 +158,23 @@ function App() {
       return
     }
 
-    if (startTime >= endTime) {
+    if ((startTime || endTime) && (!startTime || !endTime || startTime >= endTime)) {
       setMessage('End time must be after start time.')
       return
     }
 
-    saveTasks([
-      ...tasks,
-      {
-        id: crypto.randomUUID(),
-        name,
-        category,
-        date: selectedDate,
-        points: Number(effort),
-        startTime,
-        endTime,
-      },
-    ])
+    if(conflicts(tasks,{id:editingId,date:selectedDate,startTime,endTime}).length){setMessage('This time overlaps another task. Please choose another time.');return}
+    if(deadline&&(!validDate(deadline)||selectedDate>deadline)){setMessage('Choose a deadline on or after the planned date.');return}
+    const previous=tasks.find(t=>t.id===editingId)
+    const updated={...previous,id:editingId||crypto.randomUUID(),name,category,date:selectedDate,points:category==='Recovery'?0:Number(effort),startTime,endTime,deadline,fixed,priority}
+    saveTasks(editingId?tasks.map(t=>t.id===editingId?updated:t):[...tasks,updated])
 
     setTaskName('')
     setStartTime('09:00')
     setEndTime('10:00')
-    setMessage(`${name} added.`)
+    setMessage(`${name} ${editingId ? "updated" : "added"}.`)
 
-    navigate('dashboard')
+    navigate('planner')
   }
 
   const loads = categories.map(cat => {
@@ -412,11 +238,12 @@ function App() {
 
   const overload = Math.max(0, totalLoad - dailyCapacity)
 
-  const suggestion = suggestAIAdjustment(
+  const suggestion = suggestMove(
     tasks,
     selectedDate,
     dailyCapacity,
-    today
+    today,
+    capacityForDay
   )
 
   function acceptSuggestion() {
@@ -465,38 +292,11 @@ function App() {
   const [message, setMessage] = useState('')
   const [storageError, setStorageError] = useState(false)
 
-  const [aiRecommendation, setAiRecommendation] = useState(null)
-  const [showFlowchartWarning, setShowFlowchartWarning] = useState(false)
-
-  useEffect(() => {
-    const totalLoad = dayTasks.reduce((sum, task) => sum + Number(task.points), 0)
-    const overload = Math.max(0, totalLoad - dailyCapacity)
-
-    if (overload > 0) {
-      const userState = {
-        mentalFatigue: dayTasks.length > 3 || selectedMood === 'Stressed' || selectedMood === 'Anxious',
-        energyLevel: selectedMood,
-        upcomingTasks: dayTasks,
-      }
-
-      const evaluation = evaluateUserStatus(userState)
-      const scheduleCheck = processScheduleCheck(userState.upcomingTasks)
-
-      if (evaluation.recommendation) {
-        setAiRecommendation(evaluation.recommendation)
-        setShowFlowchartWarning(true)
-      } else if (scheduleCheck.suggestion) {
-        setAiRecommendation(scheduleCheck.suggestion)
-        setShowFlowchartWarning(true)
-      } else {
-        setShowFlowchartWarning(false)
-      }
-    } else {
-      setShowFlowchartWarning(false)
-    }
-  }, [selectedMood, dayTasks, dailyCapacity])
+  const showFlowchartWarning=overload>0
+  const aiRecommendation=overload>0 ? 'Your planned load exceeds this day’s capacity. Review a flexible task or leave room for a break.' : ''
 
   function saveTasks(nextTasks) {
+    setUndoSnapshot(tasks)
     setTasks(nextTasks)
 
     try {
@@ -535,7 +335,7 @@ function App() {
             fontWeight: 600
           }}
         >
-          ✨ AI Assistant
+          ✨ Planning assistant
         </span>
       </header>
 
@@ -543,7 +343,7 @@ function App() {
         <>
           <div className="intro">
             <h1>Pick a day</h1>
-            <p>Tap a date to see its load and tasks.</p>
+            <p>Tap a date to open its daily planner.</p>
           </div>
 
           <Calendar
@@ -554,19 +354,20 @@ function App() {
               setSelectedDate(day)
               setMessage('')
               setShowSuggestions(false)
-              navigate('dashboard')
+              navigate('planner')
             }}
           />
         </>
       )}
 
+      {page === 'planner' && <Planner date={selectedDate} today={today} tasks={dayTasks} onDate={day=>{setSelectedDate(day);setMessage('');setShowSuggestions(false)}} onEdit={beginEdit} onAdd={beginAdd} onToggle={task=>{saveTasks(tasks.map(t=>t.id===task.id?{...t,done:!t.done}:t));setMessage(task.done?'Marked unfinished.':'Task completed.')}} />}
       {page === 'companion' && <AICompanion />}
 
-      {page === 'profile' && <Profile />}
+      {page === 'profile' && <Profile theme={theme} setTheme={setTheme} background={background} setBackground={setBackground} />}
 
       {page === 'add-task' && (
         <section className="task-section">
-          <h1>Add a little task</h1>
+          <h1>{editingId ? "Edit task" : "Add a little task"}</h1><button type="button" className="back-button" onClick={()=>navigate("planner")}>Cancel</button>
           <p>Planning for {date}</p>
 
           <form className="task-form" onSubmit={addTask}>
@@ -615,7 +416,7 @@ function App() {
                   type="time"
                   value={startTime}
                   onChange={event => setStartTime(event.target.value)}
-                  required
+                  
                 />
               </label>
 
@@ -625,13 +426,17 @@ function App() {
                   type="time"
                   value={endTime}
                   onChange={event => setEndTime(event.target.value)}
-                  required
+                  
                 />
               </label>
             </div>
 
+<label>Priority<select value={priority} onChange={e=>setPriority(e.target.value)}><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+<p className="helper">Priority is importance; effort is how much energy the task takes.</p>
+<label>Deadline (optional)<input type="date" min={selectedDate} value={deadline} onChange={e=>setDeadline(e.target.value)} /></label>
+<label className="fixed-toggle"><input type="checkbox" checked={fixed} onChange={e=>setFixed(e.target.checked)} /> Fixed commitment — keep this task on its planned day</label>
             <button className="primary-button" type="submit">
-              + Add task
+              {editingId ? "Save changes" : "+ Add task"}
             </button>
           </form>
 
@@ -740,7 +545,7 @@ function App() {
                   marginBottom: '0.5rem',
                 }}
               >
-                How are you feeling today?
+                {selectedDate === today ? 'How are you feeling today?' : 'Capacity estimate for this day'}
               </label>
 
               <div
@@ -755,6 +560,7 @@ function App() {
                   <button
                     type="button"
                     key={m.label}
+                    disabled={selectedDate !== today}
                     onClick={() => setSelectedMood(m.label)}
                     style={{
                       background:
@@ -796,7 +602,7 @@ function App() {
                   marginBottom: '0.8rem'
                 }}
               >
-                Your energy sets your daily capacity: Stressed (5 pts) to Great (12 pts).
+                {selectedDate === today ? "Your check-in is saved for today only." : "Uses your saved check-in, or an 8-point estimate. Check in when the day arrives."}
               </p>
             </div>
 
@@ -844,7 +650,7 @@ function App() {
                 <span style={{ fontSize: '0.85rem', color: 'var(--muted, #666)' }}>{totalLoad} pts planned</span>
               </div>
 
-              <div className="load-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div className="load-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {loads.map(load => (
                   <div className="load-row" key={load.name} style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.5)', padding: '0.5rem 0.75rem', borderRadius: '8px' }}>
                     <span
@@ -888,10 +694,7 @@ function App() {
             style={{ margin: '1.5rem 0' }}
           >
             <button
-              onClick={() => {
-                setMessage('')
-                navigate('add-task')
-              }}
+              onClick={beginAdd}
               style={{ width: '100%' }}
             >
               + Add task
@@ -900,7 +703,7 @@ function App() {
 
           <p className="selected-day" aria-live="polite">
             {selectedDate === today ? 'Today' : date} ·{' '}
-            {dayTasks.length} tasks
+            {dayTasks.filter(t=>t.done).length} of {dayTasks.length} done · Completed effort remains in your load
           </p>
 
           <section
@@ -908,7 +711,7 @@ function App() {
             aria-labelledby="tasks-title"
           >
             <h2 id="tasks-title">
-              Tasks for{' '}
+              Daily planner ·{' '}
               {selectedDate === today ? 'today' : date}
             </h2>
 
@@ -930,7 +733,7 @@ function App() {
               </p>
             ) : (
               <ul className="task-list">
-                {dayTasks.map(task => {
+                {[...dayTasks].sort((a,b)=>(a.startTime||'99:99').localeCompare(b.startTime||'99:99') || ({high:0,medium:1,low:2}[a.priority||'medium'] - {high:0,medium:1,low:2}[b.priority||'medium'])).map(task => {
                   const points = Number(task.points);
                   const isHeavy = points === 3;
                   const isMedium = points === 2;
@@ -946,17 +749,21 @@ function App() {
                     }}>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <strong>{task.name}</strong>
+                          <label className="completion-toggle"><input type="checkbox" checked={!!task.done} onChange={()=>{saveTasks(tasks.map(t=>t.id===task.id?{...t,done:!t.done}:t));setMessage(task.done?'Marked unfinished.':'Task completed.')}} /><strong style={{textDecoration:task.done?'line-through':'none'}}>{task.name}</strong></label>
+                          <span className={`priority-badge priority-${task.priority||"medium"}`}>{task.priority||"medium"} priority</span>
                           <span className="effort-badge" style={{ background: badgeBg, color: badgeColor }}>
                             {effortLabel}
                           </span>
                         </div>
                         <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.2rem' }}>
-                          🕒 {task.startTime} – {task.endTime} · {task.category} · {points} {points === 1 ? 'point' : 'points'}
+                          🕒 {task.startTime ? `${task.startTime} – ${task.endTime || '?'}` : 'Unscheduled'} · {task.category} · {points} {points === 1 ? 'point' : 'points'}
                         </p>
                       </div>
 
-                      <button type="button" className="remove-task" onClick={() => startTrade(task)} aria-label={`Reschedule ${task.name}`}>Reschedule</button>
+{task.deadline && <p className="helper">Due {task.deadline}{!task.done&&task.deadline<today?' · Overdue':''}</p>}
+{task.fixed && <p className="helper">Fixed commitment</p>}
+<button type="button" className="remove-task" onClick={()=>beginEdit(task)}>Edit</button>
+                      <button type="button" className="remove-task" disabled={task.fixed || task.done} onClick={() => startTrade(task)} aria-label={`Reschedule ${task.name}`}>Reschedule</button>
                       <button type="button" className="remove-task" aria-label={`Remove ${task.name}`} onClick={() => { saveTasks(tasks.filter(item => item.id !== task.id)); setMessage(`${task.name} removed.`); }}>Remove</button>
 
                       {tradingTask === task.id && (
@@ -996,7 +803,7 @@ function App() {
                                 (tradeDate === task.date
                                   ? 0
                                   : Number(task.points))}{' '}
-                              / {dailyCapacity} points after
+                              / {capacityForDay(tradeDate)} points after
                               moving.
                             </p>
                           )}
@@ -1130,6 +937,7 @@ function App() {
         </>
       )}
 
+{undoSnapshot&&<div className="task-undo" role="status"><span>Task changed</span><button onClick={undoChange}>Undo</button><button aria-label="Dismiss undo" onClick={()=>setUndoSnapshot(null)}>×</button></div>}
       <BottomNav page={page} navigate={navigate} />
     </main>
   )
