@@ -780,6 +780,17 @@ function App() {
                   </button>
                 ))}
               </div>
+              <p 
+                style={{ 
+                  fontSize: '0.75rem', 
+                  color: 'var(--muted, #666)', 
+                  textAlign: 'center', 
+                  marginTop: '0.5rem', 
+                  marginBottom: '0.8rem'
+                }}
+              >
+                Your energy sets your daily capacity: Stressed (5 pts) to Great (12 pts).
+              </p>
             </div>
 
             <div
