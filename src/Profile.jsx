@@ -75,7 +75,7 @@ export default function Profile() {
               <span className="menu-icon">👤</span>
               <span className="menu-text">
                 <span className="menu-title">Account</span>
-                <span className="menu-desc">Name, username & password</span>
+                <span className="menu-desc">User informations</span>
               </span>
             </span>
             <span className="menu-arrow">➔</span>
