@@ -70,10 +70,8 @@ Table of every distinct idea generated, with why each was kept or dropped, order
 | Gamified Student Workload and Energy Management System | Dropped because the reward system makes the user feel obligated to keep logging in and doing tasks |
 | Timo | Chosen because the features targets what problems stakeholders are facing and present the solution to their issues in a simplified way to tackle it |
 
-
 2.2 Ideation Boards
 You can embed the images directly (recommended) or have links to your ideation board. Don’t feel forced to add as many diagrams as you can for “more marks”. The reviewers want to know how your team put your minds together to create your solution. It can be messy, with a lot of small dropped ideas. Add 1–2 lines under each explaining what it shows.
-
 
 IMPORTANT: You can express this in any way you like, including but not limited to:
 Mindmaps
@@ -88,29 +86,32 @@ Fishbone diagrams
 Any other scribbles :)
 You can embed images in markdown like so:
 ![Mindmap](mindmap.png)
+
 2.3 Mentor Consultation
-Date
-Mentor
-Feedback Received
-What Was Changed
-
-
-
-
-
-
-
-
+| Date | Mentor | Feedback Received | What Was Changed |
+| ---- | ------ | ----------------- | ---------------- |
+| 10 September 2026 | Looi Wei En | 
+| 11 September 2026 | Lim Zi Yang | 
 
 Even if you disagreed with a piece of feedback, you can say so and explain why. You will not be penalised for doing something against a mentor’s advice, it will still count as engaging with it.
+
+
 3. Design & Prototype
 UI Prototype: [ Public Link ]
 Check that it opens in an incognito window. This can be a link to Figma, Canva, Netlify, Vercel or any other board where you showcase your UI. It can be clickable with hyperlinks or simply ordered screenshots.
 We recommend you embed or link 4–8 key screens as images, with a caption on each explaining the interaction
-4. What Makes It Different
 
-List out novel features and explain briefly which each is original or what the twist is.
-You can have a comparison table to compare with existing solutions named in section 1 but this is completely optional.
+
+4. What Makes It Different
+| Novel Feature | What makes it different |
+| ------------- | ----------------------- |
+| Dynamic Energy Capacity | Instead of only tracking tasks, the app calculates the user's current capacity based on workload, available time, stress check-ins and recovery activities |
+|Adaptive Workload Intervention | When the user's capacity drops, the app doesn't just send a warning. It automatically reduces or postpones lower priority tasks while protecting important deadlines | 
+| AI-powered Workload Breakdown | Users can upload their syllabi or assignment documents and Gemini extracts deadlines and breaks large assignments into smaller and manageable tasks, reducing manual task creation |
+| Recovery-Aware Planning | Recovery is treated as part of workload management. The app recommends suitable breaks or recovery activities based on the user's current capacity instead of simply encouraging them to work more |
+| Continuous Recalculation | The user's capacity doesn't simply reset everyday. Changes in workload, completed tasks, stress and recovery continuously affect the user's current capacity and schedule |
+
+Existing productivity apps mainly help users organize what they need to do. Our system goes further by considering what the user can realistically handle and actively adjusting their workload when their capacity decreases.
 
 5. Technical Architecture & Feasibility
 Tech stack
@@ -133,12 +134,11 @@ Expected Constraints:
 4. Developement time - To remain feasible, advanced smartwatch integration will be treated as secondary if time is limited
 
 
-System architecture diagram (Optional, if you feel it would help the reviewers understand your architecture better)
+System architecture diagram 
+
 
 
 Build plan & scope
-Explicitly tell the reviewer what you plan to build during the building phase. Narrow scope will read as realistic and feasible, not as a lack of ambition.
-
 Phase 1 - Core Workload Management
 Buiild:
 1. User registration/login
