@@ -468,7 +468,7 @@ function App() {
   const [aiRecommendation, setAiRecommendation] = useState(null)
   const [showFlowchartWarning, setShowFlowchartWarning] = useState(false)
 
-  useEffect(() => {
+ useEffect(() => {
     const userState = {
       mentalFatigue: dayTasks.length > 3 || selectedMood === 'Stressed' || selectedMood === 'Anxious',
       energyLevel: selectedMood,
@@ -478,10 +478,10 @@ function App() {
     const evaluation = evaluateUserStatus(userState)
     const scheduleCheck = processScheduleCheck(userState.upcomingTasks)
 
-    if (evaluation.recommendation.includes('break') || evaluation.recommendation.includes('games')) {
+    if (evaluation.recommendation) {
       setAiRecommendation(evaluation.recommendation)
       setShowFlowchartWarning(true)
-    } else if (scheduleCheck.suggestion.includes('reschedule')) {
+    } else if (scheduleCheck.suggestion) {
       setAiRecommendation(scheduleCheck.suggestion)
       setShowFlowchartWarning(true)
     } else {
