@@ -5,36 +5,7 @@ import './App.css'
 function AICompanion() {
   const [message, setMessage] = useState('')
 
-  const [conversation, setConversation] = useState([
-    {
-      sender: 'ai',
-      text: "Hi! I'm Timo 🌿 How are you feeling today?"
-    },
-    {
-      sender: 'user',
-      text: "I'm feeling quite stressed. I have a lot of assignments."
-    },
-    {
-      sender: 'ai',
-      text: "That sounds like a lot to carry. 💜 Let's take it one step at a time."
-    },
-    {
-      sender: 'ai',
-      text: "I noticed you have 8 points of work planned today, which is close to your current capacity."
-    },
-    {
-      sender: 'ai',
-      text: "You could move 'Review lecture notes' to tomorrow and take a 30-minute recovery break today. 🌱"
-    },
-    {
-      sender: 'user',
-      text: "Okay, that sounds better."
-    },
-    {
-      sender: 'ai',
-      text: "Great! Remember, being productive doesn't mean filling every minute of your day. You deserve some breathing room too. ☁️"
-    }
-  ])
+  const [conversation, setConversation] = useState([{sender:'ai',text:'Hi! This is a demo companion with preset replies. I cannot see or change your tasks.'}])
 
   function sendMessage(event) {
     event.preventDefault()
@@ -114,7 +85,7 @@ function AICompanion() {
         </div>
 
         <h1>
-          Talk to Timo
+          Talk to Timo · Demo
         </h1>
 
       <div className="companion-status">

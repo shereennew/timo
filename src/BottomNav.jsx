@@ -1,6 +1,7 @@
 export default function BottomNav({ page, navigate }) {
   const navItems = [
-    { id: 'dashboard', label: 'Today', icon: '☀️' },
+    { id: 'planner', label: 'Planner', icon: '🕒' },
+    { id: 'dashboard', label: 'Overview', icon: '☀️' },
     { id: 'calendar', label: 'Calendar', icon: '📅' },
     { id: 'companion', label: 'Companion', icon: '🤖' },
     { id: 'profile', label: 'Profile', icon: '👤' },
@@ -47,7 +48,8 @@ export default function BottomNav({ page, navigate }) {
             onClick={() => navigate(item.id)}
             aria-current={isActive ? 'page' : undefined}
             style={{
-              width: '90px',
+              flex: 1,
+              minWidth: 0,
               height: '56px',
 
               background: isActive
@@ -57,7 +59,7 @@ export default function BottomNav({ page, navigate }) {
               border: 'none',
               borderRadius: '16px',
 
-              padding: '5px 8px',
+              padding: '5px 2px',
 
               display: 'flex',
               flexDirection: 'column',
@@ -95,4 +97,5 @@ export default function BottomNav({ page, navigate }) {
     </nav>
   )
 }
+
 
