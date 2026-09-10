@@ -1,4 +1,7 @@
 /* Shared colour variables let one setting recolour the whole dashboard. */
+html {
+  overflow-y: scroll; /* Forces the scrollbar track to always remain visible so layout never jumps */
+}
 
 .dashboard {
   --accent: #d8c4ef; --accent-dark: #62427e; --soft: #f5eefc;
@@ -157,11 +160,11 @@ h2 {
 }
 
 .load-list {
-  background: #fffdf5; border: 1px solid var(--border); border-radius: 18px; padding: 0 16px;
+  background: #fffdf5; border: 1px solid var(--border); border-radius: 18px; padding: 0 20px;
 }
 
 .load-row {
-  padding: 16px 0; gap: 12px;
+  padding: 20px 0; gap: 14px;
 }
 
 .load-row + .load-row {
@@ -391,6 +394,27 @@ h3 {
 
 .remove-task {
   font: inherit; font-size: 13px; min-height: 44px; padding: 8px; border: 0; border-radius: 8px; background: var(--soft); color: var(--accent-dark); cursor: pointer;
+}
+
+.task-item {
+  border-left: 4px solid transparent;
+  padding: 1rem 1rem 1rem 1.25rem;
+  margin-bottom: 0.75rem;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  list-style: none;
+  overflow: hidden; /* Keeps the left border cleanly clipped to the rounded corner */
+}
+
+.task-item.heavy {
+  border-left-color: #e53e3e;
+}
+
+.effort-badge {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 6px;
+  fontWeight: 600;
 }
 
 
@@ -634,4 +658,338 @@ footer {
   .calendar .calendar-day span { font-size: 13px; }
   .calendar .calendar-day small { font-size: 9px; }
   .calendar-heading button { width: 36px; height: 36px; min-height: 36px; }
+}
+
+/* Profile.css */
+
+.profile-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: #ffffff;
+  border: 1px solid var(--border, #e2dfec);
+  border-radius: 20px;
+  padding: 24px;
+  margin-top: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 4px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border, #e2dfec);
+}
+
+.profile-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--accent, #d1c4e9);
+  color: var(--accent-dark, #4527a0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.35rem;
+  flex-shrink: 0;
+}
+
+.profile-header h1 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--ink, #2d2b38);
+  margin: 0;
+}
+
+.profile-header p {
+  font-size: 0.86rem;
+  color: var(--muted, #6c6980);
+  margin: 4px 0 0 0;
+}
+
+/* Menu Navigation Grid */
+.profile-menu-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.menu-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 16px 20px;
+  border-radius: 14px;
+  border: 1px solid var(--border, #e2dfec);
+  background: #fffefa;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.menu-nav-btn:hover {
+  border-color: var(--accent-dark, #4527a0);
+  background: var(--hover-bg, #fcfbff);
+  transform: translateY(-1px);
+}
+
+.menu-btn-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.menu-icon {
+  font-size: 1.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--soft, #f3f0ff);
+  flex-shrink: 0;
+}
+
+.menu-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.menu-title {
+  font-weight: 600;
+  font-size: 0.96rem;
+  color: var(--ink, #2d2b38);
+}
+
+.menu-desc {
+  font-size: 0.8rem;
+  color: var(--muted, #6c6980);
+}
+
+.menu-arrow {
+  font-size: 1rem;
+  color: var(--muted, #6c6980);
+  font-weight: bold;
+}
+
+/* Forms & Inputs */
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--ink, #2d2b38);
+}
+
+.form-group input[type="text"],
+.form-group input[type="password"] {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border, #e2dfec);
+  border-radius: 10px;
+  background: #fffefa;
+  color: var(--ink, #2d2b38);
+  font: inherit;
+  font-size: 0.92rem;
+  box-sizing: border-box; /* Ensures padding doesn't affect width alignment */
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="password"]:focus {
+  outline: none;
+  border-color: var(--accent-dark, #4527a0);
+}
+
+/* Theme Selection with Color Swatch Preview */
+.theme-select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.theme-dropdown {
+  width: 100%;
+  height: 44px;
+  padding: 0 40px 0 14px;
+  border: 1px solid var(--border, #e2dfec);
+  border-radius: 10px;
+  background: #fffefa;
+  color: var(--ink, #2d2b38);
+  font: inherit;
+  font-size: 0.92rem;
+  appearance: none;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.theme-dropdown:focus {
+  outline: none;
+  border-color: var(--accent-dark, #4527a0);
+}
+
+.theme-color-preview {
+  position: absolute;
+  right: 14px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+}
+
+/* Theme preview colors */
+.theme-color-preview.theme-default { background: #d1c4e9; }
+.theme-color-preview.theme-pink { background: #f8bbd0; }
+.theme-color-preview.theme-blue { background: #bbdefb; }
+.theme-color-preview.theme-green { background: #c8e6c9; }
+
+/* Checkbox */
+.checkbox-group {
+  flex-direction: row;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500 !important;
+  color: var(--ink, #2d2b38);
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent-dark, #4527a0);
+  cursor: pointer;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.action-btn {
+  flex: 1;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  cursor: pointer;
+  border: 1px solid var(--border, #e2dfec);
+}
+
+.primary-action {
+  background: var(--accent, #d1c4e9);
+  color: var(--accent-dark, #4527a0);
+  border-color: var(--accent, #d1c4e9);
+}
+
+.secondary-action {
+  background: #fffefa;
+  color: var(--ink, #2d2b38);
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.form-actions button,
+.form-actions .primary-button,
+.form-actions .back-button {
+  flex: 1;
+  width: auto;
+  min-height: 44px;
+  margin: 0;
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.settings-dropdown-section {
+  background: #fffefa;
+  border: 1px solid var(--border, #e2dfec);
+  border-radius: 14px;
+  padding: 14px 18px;
+  transition: all 0.2s ease;
+}
+
+.settings-dropdown-section[open] {
+  border-color: var(--accent-dark);
+  background: #ffffff;
+}
+
+.settings-dropdown-section summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--ink);
+  list-style: none; /* Removes the default list arrow/marker and the weird 0. prefix */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Hide default marker across all browsers cleanly */
+.settings-dropdown-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-dropdown-section summary::after {
+  content: "▾";
+  font-size: 1rem;
+  color: var(--muted);
+  transition: transform 0.2s ease;
+}
+
+.settings-dropdown-section[open] summary::after {
+  transform: rotate(180deg);
+}
+
+.dropdown-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border, #e2dfec);
 }
