@@ -36,6 +36,12 @@ const themes = {
   green: { label: 'Green', color: '#c5e4cd' },
 }
 
+const healthData = {
+  steps: 6240,
+  sleepHours: 7.2,
+  exerciseMinutes: 42,
+}
+
 async function suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, skippedTaskIds = []) {
   if (selectedDate < today) return null
 
@@ -549,6 +555,9 @@ Give a short, warm, comforting insight (1-2 sentences max) and explicitly recomm
     }
   }
 
+  const [selectedHealthMetric, setSelectedHealthMetric] = useState(null)
+  const [dashboardSlide, setDashboardSlide] = useState(0)
+
   const totalTasksCount = dayTasks.length
   const completedTasksCount = dayTasks.filter(t => t.done).length
   const completionPercentage = totalTasksCount > 0 ? (completedTasksCount / totalTasksCount) * 100 : 0
@@ -843,87 +852,358 @@ Give a short, warm, comforting insight (1-2 sentences max) and explicitly recomm
             className="capacity-card"
             aria-labelledby="capacity-title"
           >
-            <div className="card-heading">
-              <h2 id="capacity-title">Today's Progress</h2>
+            <div className="dashboard-carousel" id="dashboard-carousel">
+              <section className="dashboard-slide">
+                <div className="card-heading">
+                  <h2 id="capacity-title">Today's Progress</h2>
 
-              <span
-                className="capacity-label"
-                style={{
-                  background: 'var(--accent)',
-                  color: 'var(--accent-dark)',
-                  padding: '0.4rem 0.85rem',
-                  borderRadius: '20px',
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                  border: '1px solid var(--accent-dark)',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-                  letterSpacing: '-0.2px',
-                }}
-              >
-                {completedTasksCount} of {totalTasksCount} completed
-              </span>
-            </div>
-
-            <div
-              className="capacity-donut"
-              style={{ background: completionDonutBackground }}
-              role="img"
-              aria-label={`${completedTasksCount} tasks done out of ${totalTasksCount} total tasks today.`}
-            >
-              <div className="donut-center" aria-hidden="true">
-                <div className="capacity-number">
-                  {completedTasksCount}
-                  <span> / {totalTasksCount}</span>
+                  <span
+                    className="capacity-label"
+                    style={{
+                      background: 'var(--accent)',
+                      color: 'var(--accent-dark)',
+                      padding: '0.4rem 0.85rem',
+                      borderRadius: '20px',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      border: '1px solid var(--accent-dark)',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                      letterSpacing: '-0.2px',
+                    }}
+                  >
+                    {completedTasksCount} of {totalTasksCount} completed
+                  </span>
                 </div>
 
-                <p className="capacity-caption">
-                  tasks done
-                </p>
-              </div>
-            </div>
-
-            <div className="load-section" style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border, #e2d9ed)', paddingTop: '1rem' }} aria-labelledby="load-title">
-              <div className="section-heading" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                <h3 id="load-title" style={{ fontSize: '1rem', margin: 0 }}>Category Breakdown</h3>
-                <span style={{ fontSize: '0.85rem', color: 'var(--muted, #666)' }}>{totalLoad} pts planned</span>
-              </div>
-
-              <div className="load-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {loads.map(load => (
-                  <div className="load-row" key={load.name} style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.5)', padding: '0.5rem 0.75rem', borderRadius: '8px' }}>
-                    <span
-                      className="category-icon"
-                      style={{
-                        color: 'var(--accent-dark)',
-                        background: load.color,
-                        width: '28px',
-                        height: '28px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '6px',
-                        marginRight: '0.75rem',
-                        fontWeight: 'bold',
-                        fontSize: '0.8rem'
-                      }}
-                      aria-hidden="true"
-                    >
-                      {load.icon}
-                    </span>
-
-                    <div className="load-info" style={{ flex: 1 }}>
-                      <h4 style={{ margin: 0, fontSize: '0.9rem' }}>{load.name}</h4>
-                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#666' }}>{load.detail}</p>
+                <div
+                  className="capacity-donut"
+                  style={{ background: completionDonutBackground }}
+                  role="img"
+                  aria-label={`${completedTasksCount} tasks done out of ${totalTasksCount} total tasks today.`}
+                >
+                  <div className="donut-center" aria-hidden="true">
+                    <div className="capacity-number">
+                      {completedTasksCount}
+                      <span> / {totalTasksCount}</span>
                     </div>
 
-                    <strong style={{ fontSize: '0.9rem' }}>
-                      {load.points}
-                      <span style={{ fontSize: '0.75rem', fontWeight: 'normal' }}> pts</span>
-                    </strong>
+                    <p className="capacity-caption">
+                      tasks done
+                    </p>
                   </div>
-                ))}
-              </div>
+                </div>
+
+                <div
+                  className="load-section"
+                  style={{
+                    marginTop: '1.5rem',
+                    borderTop: '1px solid var(--border, #e2d9ed)',
+                    paddingTop: '1rem'
+                  }}
+                  aria-labelledby="load-title"
+                >
+                  <div
+                    className="section-heading"
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginBottom: '0.75rem'
+                    }}
+                  >
+                    <h3
+                      id="load-title"
+                      style={{ fontSize: '1rem', margin: 0 }}
+                    >
+                      Category Breakdown
+                    </h3>
+
+                    <span
+                      style={{
+                        fontSize: '0.85rem',
+                        color: 'var(--muted, #666)'
+                      }}
+                    >
+                      {totalLoad} pts planned
+                    </span>
+                  </div>
+
+                  <div
+                    className="load-list"
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    {loads.map(load => (
+                      <div
+                        className="load-row"
+                        key={load.name}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          background: 'rgba(255,255,255,0.5)',
+                          padding: '0.5rem 0.75rem',
+                          borderRadius: '8px'
+                        }}
+                      >
+                        <span
+                          className="category-icon"
+                          style={{
+                            color: 'var(--accent-dark)',
+                            background: load.color,
+                            width: '28px',
+                            height: '28px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '6px',
+                            marginRight: '0.75rem',
+                            fontWeight: 'bold',
+                            fontSize: '0.8rem'
+                          }}
+                          aria-hidden="true"
+                        >
+                          {load.icon}
+                        </span>
+
+                        <div
+                          className="load-info"
+                          style={{ flex: 1 }}
+                        >
+                          <h4 style={{ margin: 0, fontSize: '0.9rem' }}>
+                            {load.name}
+                          </h4>
+
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: '0.75rem',
+                              color: '#666'
+                            }}
+                          >
+                            {load.detail}
+                          </p>
+                        </div>
+
+                        <strong style={{ fontSize: '0.9rem' }}>
+                          {load.points}
+                          <span
+                            style={{
+                              fontSize: '0.75rem',
+                              fontWeight: 'normal'
+                            }}
+                          >
+                            {' '}pts
+                          </span>
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              <section className="dashboard-slide health-slide">
+                <div
+                  className="health-card"
+                  aria-labelledby="health-title"
+                >
+                  <div className="health-heading">
+                    <div>
+                      <h2 id="health-title">Health Today</h2>
+                      <p>Simulated health data for prototype</p>
+                    </div>
+
+                    <div className="health-icon">💚</div>
+                  </div>
+
+                  <div className="health-metrics">
+                    <button
+                      type="button"
+                      className={`health-metric ${selectedHealthMetric === 'steps' ? 'selected' : ''}`}
+                      onClick={() => setSelectedHealthMetric('steps')}
+                    >
+                      <div className="health-metric-icon">🚶</div>
+                      <strong>{healthData.steps.toLocaleString()}</strong>
+                      <span>Steps</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`health-metric ${selectedHealthMetric === 'sleep' ? 'selected' : ''}`}
+                      onClick={() => setSelectedHealthMetric('sleep')}
+                    >
+                      <div className="health-metric-icon">😴</div>
+                      <strong>{healthData.sleepHours} hrs</strong>
+                      <span>Sleep</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`health-metric ${selectedHealthMetric === 'exercise' ? 'selected' : ''}`}
+                      onClick={() => setSelectedHealthMetric('exercise')}
+                    >
+                      <div className="health-metric-icon">🏃</div>
+                      <strong>{healthData.exerciseMinutes} min</strong>
+                      <span>Exercise</span>
+                    </button>
+                  </div>
+
+                  {selectedHealthMetric && (
+                    <div className='health-detail'>
+                      {selectedHealthMetric === 'steps' && (
+                        <>
+                          <div className='health-detail-heading'>
+                            <span>🚶</span>
+                            <h3>Steps</h3>
+                          </div>
+
+                          <div className='health-detail-main'>
+                            <strong>{healthData.steps.toLocaleString()}</strong>
+                            <span>today</span>
+                          </div>
+
+                          <div className='health-detail-row'>
+                            <span>Daily Goal</span>
+                            <strong>8000</strong>
+                          </div>
+
+                          <div className='health-detail-row'>
+                            <span>Progress</span>
+                            <strong>{Math.round((healthData.steps / 8000 ) * 100)}%</strong>
+                          </div>
+                        </>
+                      )}
+
+                      {selectedHealthMetric === 'sleep' && (
+                        <>
+                          <div className='health-detail-heading'>
+                            <span>😴</span>
+                            <h3>Sleep</h3>
+                          </div>
+
+                          <div className='health-detail-main'>
+                            <strong>{healthData.sleepHours} hours</strong>
+                            <span>last night's sleep</span>
+                          </div>
+
+                          <div className='health-detail-row'>
+                            <span>Sleep Goal</span>
+                            <strong>8 hours</strong>
+                          </div>
+                        </>
+                      )}
+
+                      {selectedHealthMetric === 'exercise' && (
+                      <>
+                        <div className="health-detail-heading">
+                          <span>🏃</span>
+                          <h3>Exercise</h3>
+                        </div>
+
+                        <div className="health-detail-main">
+                          <strong>{healthData.exerciseMinutes} minutes</strong>
+                          <span>today</span>
+                        </div>
+
+                        <div className="health-detail-row">
+                          <span>Walking</span>
+                          <strong>25 min</strong>
+                        </div>
+
+                        <div className="health-detail-row">
+                          <span>Other activity</span>
+                          <strong>17 min</strong>
+                        </div>
+                      </>
+                    )}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    className="health-sync-button"
+                    onClick={() => alert('Health data synced successfully!')}
+                  >
+                    <span>🔄</span>
+                    Sync Health Data
+                  </button>
+                </div>
+              </section>
             </div>
+
+            <div className='carousel-controls'>
+
+              <button 
+                type="button"
+                className='carousel-arrow'
+                onClick={() => {
+                  const nextSlide = Math.max(0, dashboardSlide - 1)
+                  setDashboardSlide(nextSlide)
+
+                  document.getElementById('dashboard-carousel')?.scrollTo({
+                    left: nextSlide * document.getElementById('dashboard-carousel').clientWidth,
+                    behavior: 'smooth',
+                  })
+                }}
+                aria-label='Previous card'
+                disabled={dashboardSlide === 0}
+              >
+                ‹
+              </button>
+
+              <div className='carousel-dots' aria-label='Dashboard cards'>
+                <button
+                  type="button"
+                  className={`carousel-dot ${dashboardSlide === 0 ? 'active' : ''}`}
+                  onClick={() => {
+                    setDashboardSlide(0)
+                    document.getElementById('dashboard-carousel')?.scrollTo({
+                      left: 0,
+                      behavior: 'smooth',
+                    })
+                  }}
+                  aria-label="Today's Progress"
+                />
+
+                <button
+                  type="button"
+                  className={`carousel-dot ${dashboardSlide === 1 ? 'active' : ''}`}
+                  onClick={() => {
+                    const carousel = document.getElementById('dashboard-carousel')
+
+                    setDashboardSlide(1)
+
+                    carousel?.scrollTo({
+                      left: carousel.clientWidth,
+                      behavior: 'smooth',
+                    })
+                  }}
+                  aria-label="Health Today"
+                />
+              </div>
+
+              <button
+                type="button"
+                className="carousel-arrow"
+                onClick={() => {
+                  const carousel = document.getElementById('dashboard-carousel')
+                  const nextSlide = Math.min(1, dashboardSlide + 1)
+
+                  setDashboardSlide(nextSlide)
+
+                  carousel?.scrollTo({
+                    left: nextSlide * carousel.clientWidth,
+                    behavior: 'smooth',
+                  })
+                }}
+                aria-label="Next card"
+                disabled={dashboardSlide === 1}
+              >
+                ›
+              </button>
+            </div>
+
           </section>
 
           <nav

@@ -553,7 +553,7 @@ h3 {
   font-size: 0.7rem;
   padding: 0.1rem 0.5rem;
   border-radius: 6px;
-  fontWeight: 600;
+  font-weight: 600;
 }
 
 
@@ -1176,3 +1176,298 @@ button.week-heading { cursor: pointer; }
 .week-unscheduled { padding: 8px 4px; border-top: 1px solid var(--border); font-size: 12px; }
 .week-unscheduled button { display: block; width: 100%; margin-bottom: 6px; background: var(--accent); border: 0; border-radius: 6px; padding: 6px; color: var(--ink); cursor: pointer; }
 .dashboard:has(.week-planner) { width: min(100% - 32px, 1100px); }
+
+/* Health Design */
+.health-card {
+  margin-top: 0;
+  padding: 24px;
+  background: var(--soft);
+  border-radius: 22px;
+}
+
+.health-heading{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.health-heading h2{
+  margin: 0;
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -.3px;
+}
+
+.health-heading p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.health-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--accent);
+  font-size: 20px;
+}
+
+.health-metrics{
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.health-metric {
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  padding: 16px 10px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  background: #fffdf5;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+
+  cursor: pointer;
+  transition: 0.2s ease;
+  box-sizing: border-box;
+}
+
+.health-metric-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  margin-bottom: 8px;
+
+  background: var(--soft);
+  border-radius: 12px;
+
+  font-size: 18px;
+}
+
+.health-metric strong{
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.health-metric span{
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.health-metric:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-dark);
+}
+
+.health-metric:active {
+  transform: translateY(0);
+}
+
+.health-metric:focus-visible {
+  outline: 2px solid var(--accent-dark);
+  outline-offset: 2px;
+}
+
+.health-metric.selected {
+  border-color: var(--accent-dark);
+  background: var(--soft);
+}
+
+.health-sync-button {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--accent);
+  color: var(--accent-dark);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.health-sync-button:hover{
+  filter: brightness(1.03);
+}
+
+.health-sync-button:focus-visible{
+  outline: 2px solid var(--accent-dark);
+  outline-offset: 3px;
+}
+
+.health-sync-button span{
+  font-size: 17px;
+}
+
+.dashboard-carousel {
+  display: flex;
+  width: calc(100% + 48px);
+  margin-left: -24px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dashboard-carousel::-webkit-scrollbar {
+  display: none;
+}
+
+.dashboard-slide {
+  flex: 0 0 100%;
+  min-width: 100%;
+  box-sizing: border-box;
+  scroll-snap-align: start;
+  padding: 0 24px;
+}
+
+.health-detail {
+  margin-top: 14px;
+  padding: 16px;
+  background: #fffdf5;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.health-detail-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.health-detail-heading span {
+  font-size: 20px;
+}
+
+.health-detail-heading h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.health-detail-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.health-detail-main strong {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.health-detail-main span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.health-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.health-detail-row span {
+  color: var(--muted);
+}
+
+.health-detail-row strong {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.carousel-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+
+.carousel-arrow {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+
+  background: #fffdf5;
+  color: var(--accent-dark);
+
+  font-size: 24px;
+  line-height: 1;
+  font-family: inherit;
+
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.carousel-arrow:hover:not(:disabled) {
+  background: var(--accent);
+  transform: scale(1.05);
+}
+
+.carousel-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.carousel-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.carousel-dot {
+  width: 8px;
+  height: 8px;
+
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+
+  background: var(--border);
+  cursor: pointer;
+
+  transition: 0.2s ease;
+}
+
+.carousel-dot.active {
+  width: 20px;
+  border-radius: 999px;
+  background: var(--accent-dark);
+}
