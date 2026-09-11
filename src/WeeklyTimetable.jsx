@@ -24,6 +24,7 @@ function layoutDay(tasks) {
 }
 
 export default function WeeklyTimetable({ date, today, tasks, onDate, onEdit, view, onViewChange }) {
+  const hourHeight = 44
   const monday = parseDate(date)
   monday.setDate(monday.getDate() - (monday.getDay() + 6) % 7)
   
@@ -91,12 +92,13 @@ export default function WeeklyTimetable({ date, today, tasks, onDate, onEdit, vi
         </div>
       </div>
 
-      <div className="week-scroll" tabIndex={0} role="region" aria-label="Scrollable weekly timetable" style={{ width: '100%', overflowX: 'auto', maxHeight: '500px' }}>
+      <div className="week-scroll" tabIndex={0} role="region" aria-label="Scrollable weekly timetable" style={{ width: '100%', overflowX: 'auto', maxHeight: '420px' }}>
         <div 
           className="week-grid" 
           style={{ 
             display: 'grid', 
-            gridTemplateColumns: `50px repeat(${displayedDays.length}, minmax(${view === 'daily' ? '1fr' : '100px'}, 1fr))` 
+            gridTemplateColumns: `44px repeat(${displayedDays.length}, minmax(0, 1fr))`,
+            minWidth: view === 'daily' ? 0 : '744px' 
           }}
         >
           <div className="week-heading" style={{ padding: '0.4rem', fontSize: '0.75rem' }}>Time</div>
@@ -106,18 +108,18 @@ export default function WeeklyTimetable({ date, today, tasks, onDate, onEdit, vi
             </button>
           ))}
 
-          <div className="week-hours">{hours.map(hour => <div key={hour} style={{ height: '50px', fontSize: '0.7rem', lineHeight: '50px' }}>{label(hour)}</div>)}</div>
+          <div className="week-hours">{hours.map(hour => <div key={hour} style={{ height: hourHeight, fontSize: '0.7rem', lineHeight: 'normal' }}>{label(hour)}</div>)}</div>
           
           {displayedDays.map(({ key, timed }) => (
-            <div key={key} className="week-day" style={{ height: (end - start) * 0.8, position: 'relative' }}>
-              {hours.map(hour => <div key={hour} style={{ height: '50px', borderBottom: '1px solid rgba(0,0,0,0.04)' }} />)}
+            <div key={key} className="week-day" style={{ height: (end - start) / 60 * hourHeight, position: 'relative' }}>
+
               {timed.map(({ task, start: from, end: to, lane, lanes }) => (
                 <button 
                   key={task.id} 
                   className={`week-event${task.done ? ' is-done' : ''}`}
                   style={{ 
-                    top: ((from - start) / 60) * 50, 
-                    height: Math.max(30, ((to - from) / 60) * 50), 
+                    top: ((from - start) / 60) * hourHeight, 
+                    height: ((to - from) / 60) * hourHeight, 
                     left: `calc(${lane / lanes * 100}% + 2px)`, 
                     width: `calc(${100 / lanes}% - 4px)`, 
                     position: 'absolute',
