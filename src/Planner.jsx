@@ -21,6 +21,10 @@ export default function Planner({
   loadingSuggestion,
   currentPoints,
   maxCapacity,
+  remainingEnergy,
+  fillPercentage,
+  barColor,
+  isOverloaded,
   selectedMood,
   setSelectedMood,
   moods,
@@ -31,6 +35,7 @@ export default function Planner({
   const [view, setView] = useState('daily')
   const currentDayTasks = tasksForDay(tasks, date)
   const { rows, unscheduled } = timelineFor(currentDayTasks)
+
 
   function step(offset) {
     const d = parseDate(date)
@@ -123,20 +128,58 @@ export default function Planner({
       </div>
 
       <div className="energy-capacity-widget">
-        <div className="energy-capacity-header">
-          <span>Daily Energy Load</span>
-          <span style={{ color: overload > 0 ? '#c53030' : 'inherit', fontWeight: overload > 0 ? 700 : 500 }}>
-            {currentPoints} / {maxCapacity} pts {overload > 0 && '⚠️'}
+        <div className="energy-capacity-header" style={{ marginBottom: '0.5rem' }}>
+          <span>Daily Battery Energy</span>
+          <span style={{ fontWeight: 600, color: isOverloaded ? '#c53030' : 'inherit' }}>
+            {remainingEnergy} / {maxCapacity} pts remaining {isOverloaded && '⚠️ Over capacity!'}
           </span>
         </div>
-        <div className="energy-progress-track">
-          <div
-            className="energy-progress-fill"
-            style={{
-              width: `${Math.min(100, (currentPoints / maxCapacity) * 100)}%`,
-              background: overload > 0 ? '#e53e3e' : 'var(--accent-dark)'
-            }}
-          ></div>
+
+        {/* Battery Outer Shell */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          background: 'rgba(255, 255, 255, 0.6)',
+          border: '2.5px solid var(--accent-dark)',
+          borderRadius: '16px',
+          padding: '4px',
+          width: '100%',
+          height: '40px',
+          boxSizing: 'border-box',
+          position: 'relative'
+        }}>
+          {/* Track Background (Empty/Drained State) */}
+          <div style={{
+            position: 'absolute',
+            inset: '4px',
+            background: '#e2d9ed',
+            borderRadius: '10px'
+          }} />
+
+          {/* Dynamic Fill Bar (Remaining Energy) */}
+          <div style={{
+            width: `${fillPercentage}%`,
+            height: '100%',
+            background: barColor,
+            borderRadius: '10px',
+            transition: 'width 0.3s ease, background 0.3s ease',
+            position: 'relative',
+            zIndex: 2
+          }} />
+
+          {/* Battery Terminal Tip */}
+          <div style={{
+            position: 'absolute',
+            right: '-7px',
+            top: '12px',
+            width: '5px',
+            height: '14px',
+            background: barColor,
+            borderTopRightRadius: '3px',
+            borderBottomRightRadius: '3px',
+            zIndex: 3,
+            transition: 'background 0.3s ease'
+          }} />
         </div>
 
         {showFlowchartWarning && (
@@ -178,6 +221,7 @@ export default function Planner({
             </button>
           </div>
         )}
+        
       </div>
 
       <section className="planner-date-controls" aria-label="Change planner date">
@@ -203,7 +247,17 @@ export default function Planner({
         <button onClick={() => step(view === 'week' ? 7 : 1)} aria-label={view === 'week' ? 'Next week' : 'Next day'}>›</button>
       </div>
 
-      {view === 'week' ? <WeeklyTimetable date={date} today={today} tasks={tasks} onDate={onDate} onEdit={onEdit} /> : <>
+      {view === 'week' ? (
+        <WeeklyTimetable 
+          date={date} 
+          today={today} 
+          tasks={tasks} 
+          onDate={onDate} 
+          onEdit={onEdit} 
+          view={view} 
+          onViewChange={setView} 
+        />
+      ) : <>
       <div className="planner-timeline">
         {rows.length ? rows.map(row => row.kind === 'gap' ? (
           <div className="planner-gap" key={`gap-${row.start}`}>
@@ -288,7 +342,7 @@ export default function Planner({
                   fontSize: '0.85rem',
                   textDecoration: 'underline',
                   cursor: 'pointer',
-                  alignSelf: 'flex-start', // Pushes it to the left side
+                  alignSelf: 'flex-start',
                   padding: '0'
                 }}
               >
