@@ -91,7 +91,7 @@ You can embed images in markdown like so:
 2.3 Mentor Consultation
 | Date | Mentor | Feedback Received | What Was Changed |
 | ---- | ------ | ----------------- | ---------------- |
-| 10 September 2026 | Looi Wei En | 
+| 10 September 2026 | Looi Wei En | Focus more on demonstrating the prototype | Changed focus from features to creating a semi-working prototype |
 | 11 September 2026 | Lim Zi Yang | 
 
 Even if you disagreed with a piece of feedback, you can say so and explain why. You will not be penalised for doing something against a mentor’s advice, it will still count as engaging with it.
