@@ -1156,26 +1156,26 @@ footer {
 .planner-date-controls { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 24px; margin-bottom: 25px;}
 .planner-date-controls > h2 { margin-bottom: 16px; }
 
-/* Weekly timetable: one hour is 72px; narrow screens scroll within the planner. */
+/* Weekly timetable: one hour is 44px; narrow screens scroll within the planner. */
 .planner-view-toggle { display: flex; gap: 8px; margin: 16px 0; }
 .planner-view-toggle button { border: 1px solid var(--border); border-radius: 12px; padding: 10px 24px; background: var(--soft); color: var(--ink); cursor: pointer; }
 .planner-view-toggle button[aria-pressed="true"] { background: var(--accent); font-weight: 700; }
 .week-planner { min-width: 0; margin-bottom: 24px; }
-.week-scroll { overflow: auto; max-height: 680px; border: 1px solid var(--border); border-radius: 14px; }
-.week-grid { display: grid; grid-template-columns: 64px repeat(7, minmax(125px, 1fr)); min-width: 940px; background: var(--soft); }
+.week-scroll { overflow: auto; max-height: 420px; border: 1px solid var(--border); border-radius: 14px; }
+.week-grid { display: grid; grid-template-columns: 44px repeat(7, minmax(0, 1fr)); min-width: 744px; background: var(--soft); }
 .week-heading { position: sticky; top: 0; z-index: 3; background: var(--soft); color: var(--ink); border: 0; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 12px 4px; text-align: center; font: inherit; font-size: 13px; }
 button.week-heading { cursor: pointer; }
 .week-heading[aria-pressed="true"] { background: var(--accent); font-weight: 700; }
 .week-heading[aria-current="date"] { box-shadow: inset 0 -3px var(--accent-dark); }
 .week-hours { position: sticky; left: 0; z-index: 2; background: var(--soft); }
-.week-hours > div { height: 72px; box-sizing: border-box; padding: 4px; font-size: 12px; border-bottom: 1px solid var(--border); }
-.week-day { position: relative; border-right: 1px solid var(--border); background: repeating-linear-gradient(to bottom, transparent 0, transparent 71px, var(--border) 71px, var(--border) 72px); }
+.week-hours > div { height: 44px; box-sizing: border-box; padding: 4px; font-size: 12px; border-bottom: 1px solid var(--border); }
+.week-day { position: relative; border-right: 1px solid var(--border); background: repeating-linear-gradient(to bottom, transparent 0, transparent 43px, var(--border) 43px, var(--border) 44px); }
 .week-event { position: absolute; box-sizing: border-box; overflow: auto; border: 1px solid var(--accent-dark); border-radius: 6px; background: var(--accent); color: var(--ink); padding: 3px; text-align: left; font: inherit; font-size: 11px; cursor: pointer; }
 .week-event strong, .week-event span { display: block; overflow-wrap: anywhere; }
 .week-event.is-done strong { text-decoration: line-through; }
 .week-unscheduled { padding: 8px 4px; border-top: 1px solid var(--border); font-size: 12px; }
 .week-unscheduled button { display: block; width: 100%; margin-bottom: 6px; background: var(--accent); border: 0; border-radius: 6px; padding: 6px; color: var(--ink); cursor: pointer; }
-.dashboard:has(.week-planner) { width: min(100% - 32px, 1100px); }
+.dashboard:has(.week-planner) { width: min(100% - 32px, 820px); }
 .week-scroll {
   width: 100%;
   overflow-x: auto;
