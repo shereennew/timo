@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import WeeklyTimetable from './WeeklyTimetable'
 import { dateKey, parseDate, conflicts, tasksForDay } from './planning'
 import { timelineFor } from './timeline'
 
@@ -26,6 +28,7 @@ export default function Planner({
   showFlowchartWarning,
   onOpenCompanion
 }) {
+  const [view, setView] = useState('daily')
   const currentDayTasks = tasksForDay(tasks, date)
   const { rows, unscheduled } = timelineFor(currentDayTasks)
 
@@ -88,7 +91,7 @@ export default function Planner({
 
       <div className="mood-feedback-container planner-mood-container" style={{ textAlign: 'left', background: 'var(--soft)', border: '1px solid var(--border)', borderRadius: '16px', padding: '16px 20px' }}>
         <label style={{ display: 'block', fontWeight: 600, marginBottom: '0.5rem', fontSize: '0.9rem' }}>
-          How are you feeling today?
+          {date === today ? 'How are you feeling today?' : `Capacity check-in for ${parseDate(date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}`}
         </label>
 
         <div className="mood-options" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'space-between' }}>
@@ -187,15 +190,20 @@ export default function Planner({
         </div>
       </section>
 
+      <div className="planner-view-toggle" aria-label="Planner view">
+        <button aria-pressed={view === 'daily'} onClick={() => setView('daily')}>Daily</button>
+        <button aria-pressed={view === 'week'} onClick={() => setView('week')}>Week</button>
+      </div>
       <div className="planner-navigation">
-        <button onClick={() => step(-1)} aria-label="Previous day" >‹</button>
+        <button onClick={() => step(view === 'week' ? -7 : -1)} aria-label={view === 'week' ? 'Previous week' : 'Previous day'} >‹</button>
         <label>
           Choose date
           <input type="date" required value={date} onChange={e => { if (e.target.value) onDate(e.target.value) }} />
         </label>
-        <button onClick={() => step(1)} aria-label="Next day">›</button>
+        <button onClick={() => step(view === 'week' ? 7 : 1)} aria-label={view === 'week' ? 'Next week' : 'Next day'}>›</button>
       </div>
 
+      {view === 'week' ? <WeeklyTimetable date={date} today={today} tasks={tasks} onDate={onDate} onEdit={onEdit} /> : <>
       <div className="planner-timeline">
         {rows.length ? rows.map(row => row.kind === 'gap' ? (
           <div className="planner-gap" key={`gap-${row.start}`}>
@@ -216,6 +224,8 @@ export default function Planner({
           </section>
         )
       }
+
+      </>}
 
       <button
         className="primary-button"
