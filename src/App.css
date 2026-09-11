@@ -234,15 +234,29 @@ h3 {
    ========================= */
 
 .primary-button {
-  width: 100%; min-height: 54px; display: flex; align-items: center; justify-content: center; gap: 15px; border: 0; border-radius: 14px; color: var(--accent-dark); background: var(--accent); font: inherit; font-weight: 600; cursor: pointer;
+  width: 100%; 
+  min-height: 54px; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  gap: 15px; 
+  border: 1px solid var(--border); 
+  border-radius: 14px; 
+  color: #ffffff; 
+  background: var(--accent-dark, #5a3e7a); 
+  font: inherit; 
+  font-weight: 600; 
+  cursor: pointer;
 }
 
 .primary-button:hover {
-  background: var(--accent); filter: brightness(.96);
+  background: var(--accent); 
+  filter: brightness(0.98);
 }
 
 .primary-button:focus-visible {
-  outline: 3px solid var(--accent-dark); outline-offset: 4px;
+  outline: 3px solid var(--accent-dark); 
+  outline-offset: 4px;
 }
 
 .primary-button span {
@@ -250,11 +264,22 @@ h3 {
 }
 
 .page-actions {
-  display: flex; gap: 12px; margin: 0 0 20px;
+  display: flex; 
+  gap: 12px; 
+  margin: 0 0 20px;
 }
 
 .page-actions button, .back-button {
-  font: inherit; font-weight: 600; color: var(--accent-dark); background: var(--soft); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; min-height: 48px; cursor: pointer;
+  font: inherit; 
+  font-weight: 600; 
+  color: #ffffff; 
+  background: var(--accent-dark); 
+  border: 0; 
+  border-radius: 12px; 
+  padding: 12px 16px; 
+  min-height: 48px; 
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 .page-actions button {
@@ -263,14 +288,128 @@ h3 {
 
 .page-actions button:last-child {
   background: var(--accent);
+  color: var(--accent-dark);
+}
+
+.page-actions button:hover, .back-button:hover {
+  filter: brightness(1.15);
 }
 
 .back-button {
   margin: 16px 0 0;
+  color: var(--accent-dark);
+  background: var(--soft);
+  border: 1px solid var(--border);
 }
 
 .page-actions button:focus-visible, .back-button:focus-visible {
-  outline: 2px solid var(--accent-dark); outline-offset: 3px;
+  outline: 2px solid var(--accent-dark); 
+  outline-offset: 3px;
+}
+
+.inline-today-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-dark);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.inline-today-btn:hover {
+  opacity: 0.8;
+}
+
+/* =========================
+   ENERGY CAPACITY WIDGET WITH INSIGHT
+   ========================= */
+
+.energy-capacity-widget {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 20px;
+  margin-bottom: 0;
+}
+
+.energy-capacity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.energy-progress-track {
+  background: var(--border, #e2d9ed);
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.energy-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.planner-insight-inline {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, #e2d9ed);
+}
+
+.planner-insight-icon-small {
+  background: var(--accent, #d8c4ef);
+  color: var(--accent-dark, #5a3e7a);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+  font-weight: bold;
+}
+
+.planner-insight-title-small {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin: 0 0 0.15rem 0;
+  color: var(--ink);
+}
+
+.planner-insight-text-small {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted, #555);
+  line-height: 1.35;
+}
+
+/* =========================
+   PLANNER WIDGET SPACING
+   ========================= */
+
+.planner-mood-container {
+  margin-top: 24px !important;
+  margin-bottom: 16px;
+}
+
+.energy-capacity-widget {
+  margin-bottom: 36px !important;
+}
+
+.daily-planner > h2:first-of-type {
+  margin-top: 16px;
+  margin-bottom: 28px;
 }
 
 
@@ -1003,7 +1142,7 @@ footer {
 .priority-high { background: #fce0e5; color: #84334c; }
 .priority-medium { background: #fff0cc; color: #765714; }
 .priority-low { background: #e1f1e6; color: #356348; }
-.planner-navigation { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.planner-navigation { display: flex; align-items: center; gap: 12px; margin-top: 20px; margin-bottom: 16px;}
 .planner-navigation label { flex: 1; display: grid; gap: 6px; font-size: 14px; }
 .planner-navigation input { width: 100%; min-width: 0; font: inherit; border: 1px solid var(--border); background: #fffdf5; color: var(--ink); padding: 10px; border-radius: 10px; }
 .planner-navigation button { min-width: 44px; min-height: 44px; font-size: 24px; border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-dark); cursor: pointer; }
@@ -1014,5 +1153,5 @@ footer {
 .planner-gap { display: flex; flex-wrap: wrap; gap: 10px; padding: 16px; color: var(--muted); font-size: 14px; }
 .planner-navigation button:focus-visible,.planner-navigation input:focus-visible { outline: 2px solid var(--accent-dark); outline-offset: 3px; }
 .daily-planner > h2:first-child { margin-top: 28px; color: var(--accent-dark); }
-.planner-date-controls { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 24px; }
+.planner-date-controls { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 24px; margin-bottom: 25px;}
 .planner-date-controls > h2 { margin-bottom: 16px; }
