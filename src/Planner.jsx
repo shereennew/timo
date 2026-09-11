@@ -36,6 +36,7 @@ export default function Planner({
   const currentDayTasks = tasksForDay(tasks, date)
   const { rows, unscheduled } = timelineFor(currentDayTasks)
 
+
   function step(offset) {
     const d = parseDate(date)
     d.setDate(d.getDate() + offset)
@@ -246,7 +247,17 @@ export default function Planner({
         <button onClick={() => step(view === 'week' ? 7 : 1)} aria-label={view === 'week' ? 'Next week' : 'Next day'}>›</button>
       </div>
 
-      {view === 'week' ? <WeeklyTimetable date={date} today={today} tasks={tasks} onDate={onDate} onEdit={onEdit} /> : <>
+      {view === 'week' ? (
+        <WeeklyTimetable 
+          date={date} 
+          today={today} 
+          tasks={tasks} 
+          onDate={onDate} 
+          onEdit={onEdit} 
+          view={view} 
+          onViewChange={setView} 
+        />
+      ) : <>
       <div className="planner-timeline">
         {rows.length ? rows.map(row => row.kind === 'gap' ? (
           <div className="planner-gap" key={`gap-${row.start}`}>
