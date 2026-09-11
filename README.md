@@ -4,7 +4,7 @@ Problem Statement: Stress & Workload Manager
 Video Presentation: [Unlisted Youtube Link]   
 Presentation Slides: [Timo Presentation Slides](https://www.canva.com/design/DAHU3ykx1O4/pL2p9p5OW3lgPycNHYHdzQ/edit)
 
-1. Project Overview
+# 1. Project Overview
 
 University students struggle to manage overlapping academic, work, social, personal, and physical commitments, making it difficult to recognise when their workload exceeds their capacity. For example: difficulty deciding what to prioritize or postpone, insufficient breaks and recovery time and schedules becoming unrealistic when new commitments arise. 
 
@@ -25,8 +25,8 @@ Feature list:
 
 These are the features going to be implemented into the app.
 
-2. Ideation & Process  
-2.1 Ideas We Considered  
+# 2. Ideation & Process  
+## 2.1 Ideas We Considered  
 
 | Idea | Why it was dropped/kept |
 | ---- | ----------------------- |
@@ -35,9 +35,8 @@ These are the features going to be implemented into the app.
 | Gamified Student Workload and Energy Management System | Dropped because the reward system makes the user feel obligated to keep logging in and doing tasks |
 | Timo | Chosen because the features targets what problems stakeholders are facing and present the solution to their issues in a simplified way to tackle it |
 
-2.2 Ideation Boards  
-
-Mindmaps  
+## 2.2 Ideation Boards  
+### Mindmaps  
 2nd draft  
 <img width="891" height="1271" alt="2nd draft" src="https://github.com/user-attachments/assets/b97f3a92-8b1f-4e82-a7bf-5dd8574854d9" />  
 Draft of Interactive Avatar-Based Student Stress & Task Management. Scribbles and doodles are avatar drafts.
@@ -47,9 +46,9 @@ Final draft
 Finalized mindmaps of the final features.    
 
 
-Feature Flowcharts  
+### Feature Flowcharts  
 <img width="1861" height="911" alt="login, logout, signup drawio" src="https://github.com/user-attachments/assets/48c0471a-48a8-4f98-89ca-afe40667be09" /><br>
-Usual login and logout. First-time registration will have to answer a short quiz to determine energy capacity. Energy capacity will be different for every user.   
+Usual login and logout. First-time registration will have to answer a short quiz to determine energy capacity. Energy capacity will be different for every user.
 
 <img width="597" height="1451" alt="smart workload manager drawio" src="https://github.com/user-attachments/assets/997b7822-55a6-4f70-93c8-4d722025c912" /> <br>
 User can upload documents (e.g. assignment guidelines) to AI and it'll automatically extract details to create a schedule for the user. User can also modify the generated tasks before saving it into the schedule.  
@@ -70,55 +69,56 @@ User can add their own tasks in whichever category they prefer and if there are 
 The app will track the user's energy capacity and trigger different responses by recommending suitable rest and relaxing activities based on the remaining capacity.  
 
 
-2.3 Mentor Consultation
+## 2.3 Mentor Consultation
 | Date | Mentor | Feedback Received | What Was Changed |
 | ---- | ------ | ----------------- | ---------------- |
 | 10 September 2026 | Looi Wei En | Focus more on demonstrating the prototype | Changed focus from features to creating a semi-working prototype |
 | 11 September 2026 | Lim Zi Yang | 
 
 
-3. Design & Prototype
+# 3. Design & Prototype
 UI Prototype: [ Public Link ]
 Check that it opens in an incognito window. This can be a link to Figma, Canva, Netlify, Vercel or any other board where you showcase your UI. It can be clickable with hyperlinks or simply ordered screenshots.
 We recommend you embed or link 4–8 key screens as images, with a caption on each explaining the interaction
 
 
-4. What Makes It Different  
+# 4. What Makes It Different
+
 | Novel Feature | What makes it different |
-| ------------- | ----------------------- |
-| Dynamic Energy Capacity | Instead of only tracking tasks, the app calculates the user's current capacity based on workload, available time, stress check-ins and recovery activities |
-|Adaptive Workload Intervention | When the user's capacity drops, the app doesn't just send a warning. It automatically reduces or postpones lower priority tasks while protecting important deadlines | 
-| AI-powered Workload Breakdown | Users can upload their syllabi or assignment documents and Gemini extracts deadlines and breaks large assignments into smaller and manageable tasks, reducing manual task creation |
-| Recovery-Aware Planning | Recovery is treated as part of workload management. The app recommends suitable breaks or recovery activities based on the user's current capacity instead of simply encouraging them to work more |
-| Continuous Recalculation | The user's capacity doesn't simply reset everyday. Changes in workload, completed tasks, stress and recovery continuously affect the user's current capacity and schedule |
+|---|---|
+| Dynamic Energy Capacity | Instead of only tracking tasks, the app calculates the user's current capacity based on workload, available time, stress check-ins and recovery activities. |
+| Adaptive Workload Intervention | When the user's capacity drops, the app doesn't just send a warning. It automatically reduces or postpones lower-priority tasks while protecting important deadlines. |
+| AI-powered Workload Breakdown | Users can upload their syllabi or assignment documents, and Gemini extracts deadlines and breaks large assignments into smaller, manageable tasks, reducing manual task creation. |
+| Recovery-Aware Planning | Recovery is treated as part of workload management. The app recommends suitable breaks or recovery activities based on the user's current capacity instead of simply encouraging them to work more. |
+| Continuous Recalculation | The user's capacity doesn't simply reset every day. Changes in workload, completed tasks, stress and recovery continuously affect their current capacity and schedule. |
 
 Existing productivity apps mainly help users organize what they need to do. Our system goes further by considering what the user can realistically handle and actively adjusting their workload when their capacity decreases.
 
 
-5. Technical Architecture & Feasibility   
-Tech stack  
-| Component | Technology | Purpose | 
-| --------- | ---------- | ------- |
+# 5. Technical Architecture & Feasibility
+## Tech Stack
+
+| Component | Technology | Purpose |
+|---|---|---|
 | Frontend | Android Studio + Kotlin + Jetpack Compose | Build the Android mobile application with a modern, responsive UI |
 | Backend | Firebase Cloud Functions | Handles backend logic and securely communicates with external APIs |
 | Database | Firebase Firestore | Stores user accounts, tasks, schedules, check-ins, capacity data and points. Easy to integrate with Android |
 | Authentication | Firebase Authentication | Provides secure user registration and login without building authentication from scratch |
-| AI | Gemini API | Extracts information from uploaded documents, breaks assignments into tasks, provide recovery recommendations, and act as an AI chatbot when user feel stressed | 
-| Notifications | Android WorkManager | Handles scheduled reminders and check-in notifications reliably | 
+| AI | Gemini API | Extracts information from uploaded documents, breaks assignments into tasks, provides recovery recommendations, and acts as an AI chatbot when users feel stressed |
+| Notifications | Android WorkManager | Handles scheduled reminders and check-in notifications reliably |
 | Smartwatch | Android Health Connect | Allows the app to access supported health/activity data from compatible devices |
 
-Expected Constraints:
+### Expected Constraints:
 1. Gemini - AI-generated tasks and deadlines may be inaccurate so users can review and edit generatee tasks before saving them
 2. Firebase - Free-tier limits may restrict storage and usage during development
 3. Smartwatch - Health data availability depends on the user's device and permissions so the app must still work without a smartwatch
 4. Development time - To remain feasible, advanced smartwatch integration will be treated as secondary if time is limited
 
-System architecture diagram  
+## System architecture diagram  
 
 
-
-Build plan & scope  
-Phase 1 - Core Workload Management  
+## Build plan & scope  
+### Phase 1 - Core Workload Management  
 1. User registration/login
 2. Smart workload document upload
 3. Gemini extraction and task decomposition
@@ -126,7 +126,7 @@ Phase 1 - Core Workload Management
 5. Calendar/day task views
 6. Capacity and Workload Dashboard
 
-Phase 2 - Adaptive Capacity System  
+### Phase 2 - Adaptive Capacity System  
 1. Initial stress quiz during user registration
 2. Daily check-ins
 3. Dynamic energy capacity calculation
@@ -140,7 +140,7 @@ Phase 2 - Adaptive Capacity System
 7. Recovery recommendations
 8. Adaptive Planner
 
-Phase 3 - Supporting Features  
+### Phase 3 - Supporting Features  
 1. Activity reminders and check-ins
 2. Health connect/smartwatch integration
 
