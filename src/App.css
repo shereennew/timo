@@ -1176,3 +1176,8 @@ button.week-heading { cursor: pointer; }
 .week-unscheduled { padding: 8px 4px; border-top: 1px solid var(--border); font-size: 12px; }
 .week-unscheduled button { display: block; width: 100%; margin-bottom: 6px; background: var(--accent); border: 0; border-radius: 6px; padding: 6px; color: var(--ink); cursor: pointer; }
 .dashboard:has(.week-planner) { width: min(100% - 32px, 1100px); }
+.week-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
