@@ -36,69 +36,7 @@ const themes = {
   green: { label: 'Green', color: '#c5e4cd' },
 }
 
-/* =========================
-   FLOWCHART AI LOGIC EVALUATOR
-   ========================= */
-
-function evaluateUserStatus(userState) {
-  const { energyLevel, upcomingTasks } = userState
-
-  if (energyLevel === 'Stressed') {
-    return {
-      recommendation: "You're feeling stressed today. Let's take things slow—how about scheduling a longer break?",
-      action: 'check_schedule',
-      tasks: upcomingTasks,
-    }
-  }
-
-  if (energyLevel === 'Anxious') {
-    return {
-      recommendation: "Anxiety can feel really overwhelming. Would you like to lighten your load or take a mindful pause?",
-      action: 'check_schedule',
-      tasks: upcomingTasks,
-    }
-  }
-
-  if (energyLevel === 'Okay') {
-    return {
-      recommendation: "You're cruising at an okay pace. A short break or some light activity might feel nice soon!",
-      action: 'check_schedule',
-      tasks: upcomingTasks,
-    }
-  }
-
-  if (energyLevel === 'Good' || energyLevel === 'Great') {
-    return {
-      recommendation: "You're radiating good energy today! Keep up the great balance.",
-      action: 'continue',
-      tasks: upcomingTasks,
-    }
-  }
-
-  return {
-    recommendation: "Keeping an eye on your energy—you're doing great!",
-    action: 'continue',
-    tasks: upcomingTasks,
-  }
-}
-
-function processScheduleCheck(tasks) {
-  const hasTooManyTasks = tasks && tasks.length > 3
-
-  if (hasTooManyTasks) {
-    return {
-      suggestion: "Your schedule looks quite packed today. Want to shuffle a few things around so you don't burn out?",
-      nextStep: "Monitor user's status & energy",
-    }
-  }
-
-  return {
-    suggestion: "Your schedule is looking balanced and manageable.",
-    nextStep: "Monitor user's status & energy",
-  }
-}
-
-function suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today) {
+async function suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, skippedTaskIds = []) {
   if (selectedDate < today) return null
 
   const currentTasks = tasksForDay(tasks, selectedDate)
@@ -106,49 +44,72 @@ function suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today) {
 
   if (totalLoad <= dailyCapacity) return null
 
-  const flexibleTasks = currentTasks.filter(task => Number(task.points) < 3)
-  if (flexibleTasks.length === 0) return null
+  const eligibleTasks = currentTasks.filter(t => !skippedTaskIds.includes(t.id))
+  if (eligibleTasks.length === 0) return null
 
-  const candidate = [...flexibleTasks].sort(
-    (a, b) => Number(a.points) - Number(b.points)
-  )[0]
-
-  const remainingTasks = currentTasks.filter(task => task.id !== candidate.id)
-  const sourceAfter = remainingTasks.reduce(
-    (sum, task) => sum + Number(task.points),
-    0
-  )
-
+  const upcomingContext = []
   for (let i = 1; i <= 7; i++) {
-    const destinationDate = parseDate(selectedDate)
-    destinationDate.setDate(destinationDate.getDate() + i)
-
-    const destination = dateKey(destinationDate)
-    const destinationTasks = tasksForDay(tasks, destination)
-    const destinationBefore = destinationTasks.reduce(
-      (sum, task) => sum + Number(task.points),
-      0
-    )
-    const destinationAfter = destinationBefore + Number(candidate.points)
-
-    if (destinationAfter <= dailyCapacity) {
-      return {
-        task: candidate,
-        destination,
-        sourceBefore: totalLoad,
-        sourceAfter,
-        destinationBefore,
-        destinationAfter,
-        remaining: Math.max(0, sourceAfter - dailyCapacity),
-      }
-    }
+    const d = parseDate(selectedDate)
+    d.setDate(d.getDate() + i)
+    const dKey = dateKey(d)
+    const dTasks = tasksForDay(tasks, dKey)
+    const dLoad = dTasks.reduce((sum, task) => sum + Number(task.points), 0)
+    upcomingContext.push({ date: dKey, load: dLoad, capacity: dailyCapacity })
   }
 
-  return null
+  try {
+    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY })
+
+    const prompt = `You are Timo, an empathetic AI productivity companion. 
+    The user is overloaded on ${selectedDate}. 
+    Available tasks to choose from on this day: ${JSON.stringify(eligibleTasks)}
+    Total load: ${totalLoad} points. Daily capacity limit: ${dailyCapacity} points.
+    Upcoming available days load profile over next 7 days: ${JSON.stringify(upcomingContext)}
+
+    Choose ONE flexible task from the available tasks list to move to one of the upcoming days where it won't cause an overload.
+    Return ONLY a valid JSON object with:
+    - "taskId": string (the id of the task to move)
+    - "destinationDate": string (YYYY-MM-DD format of the target day)
+    - "reason": string (a short friendly sentence explaining why this helps)`
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash-lite',
+      contents: [prompt],
+    })
+
+    const rawText = response.text.trim()
+    const jsonString = rawText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '')
+    const result = JSON.parse(jsonString)
+
+    const candidate = currentTasks.find(t => t.id === result.taskId)
+    if (!candidate) return null
+
+    const destination = result.destinationDate
+    const destinationTasks = tasksForDay(tasks, destination)
+    const destinationBefore = destinationTasks.reduce((sum, task) => sum + Number(task.points), 0)
+    const destinationAfter = destinationBefore + Number(candidate.points)
+
+    const remainingTasks = currentTasks.filter(task => task.id !== candidate.id)
+    const sourceAfter = remainingTasks.reduce((sum, task) => sum + Number(task.points), 0)
+
+    return {
+      task: candidate,
+      destination,
+      sourceBefore: totalLoad,
+      sourceAfter,
+      destinationBefore,
+      destinationAfter,
+      remaining: Math.max(0, sourceAfter - dailyCapacity),
+      aiReason: result.reason
+    }
+  } catch (error) {
+    console.error("Gemini suggestion error, falling back:", error)
+    return null
+  }
 }
 
 function App() {
-  const [page, setPage] = useState('dashboard')
+  const [page, setPage] = useState('planner')
 
   function navigate(nextPage) {
     setPage(nextPage)
@@ -159,6 +120,8 @@ function App() {
 
   const [selectedDate, setSelectedDate] = useState(today)
   const [selectedMood, setSelectedMood] = useState('Good')
+  const [skippedTaskIds, setSkippedTaskIds] = useState([])
+  const [companionInitialMessage, setCompanionInitialMessage] = useState('')
 
   const dailyCapacity =
     moods.find(m => m.label === selectedMood)?.points || 8
@@ -277,63 +240,27 @@ function App() {
 
   const dayTasks = tasksForDay(tasks, selectedDate)
 
-  const [tradingTask, setTradingTask] = useState(null)
-  const [tradeDate, setTradeDate] = useState('')
+  const [isAnalyzingFile, setIsAnalyzingFile] = useState(false)
+  const [fileBreakdownItems, setFileBreakdownItems] = useState([])
+  const [fileDeadline, setFileDeadline] = useState('')
 
-  function startTrade(task) {
-    const nextDay = parseDate(task.date)
-    nextDay.setDate(nextDay.getDate() + 1)
-
-    setTradeDate(dateKey(nextDay))
-    setTradingTask(task.id)
-  }
-
-  function tradeTask(event, task) {
-    event.preventDefault()
-
-    if (!validDate(tradeDate) || tradeDate === task.date) return
-
-    saveTasks(
-      tasks.map(item =>
-        item.id === task.id
-          ? { ...item, date: tradeDate }
-          : item
-      )
-    )
-
-    setMessage(
-      `${task.name} moved to ${parseDate(tradeDate).toLocaleDateString(
-        'en',
-        { dateStyle: 'medium' }
-      )}.`
-    )
-
-    setTradingTask(null)
-  }
-
-  //-----BREAK DOWN CONTENT-------
-  const [isAnalyzingPdf, setIsAnalyzingPdf] = useState(false)
-  const [pdfBreakdownItems, setPdfBreakdownItems] = useState([])
-  const [pdfDeadline, setPdfDeadline] = useState('')
-
-  async function handlePdfUpload(event) {
+  async function handleFileUpload(event) {
     const file = event.target.files[0]
     if (!file) return
 
-    setIsAnalyzingPdf(true)
+    setIsAnalyzingFile(true)
     setMessage(`Scanning and analyzing ${file.name} with Gemini...`)
 
     try {
       const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY })
 
-      // Convert file to base64 inline data for Gemini
       const filePart = await new Promise((resolve, reject) => {
         const reader = new FileReader()
         reader.onloadend = () => {
           resolve({
             inlineData: {
               data: reader.result.split(',')[1],
-              mimeType: file.type || 'application/pdf'
+              mimeType: file.type || (file.name.endsWith('.txt') ? 'text/plain' : 'application/pdf')
             }
           })
         }
@@ -341,7 +268,7 @@ function App() {
         reader.readAsDataURL(file)
       })
 
-      const prompt = `Analyze this assignment or syllabus document. Extract any stated submission deadline or due date (format it strictly as YYYY-MM-DD if found, otherwise return empty string ""), and break the assignment down into 2 to 4 manageable micro-tasks. 
+      const prompt = `Analyze this uploaded assignment document, syllabus, image, or notes sheet. Extract any stated submission deadline or due date (format strictly as YYYY-MM-DD if found, otherwise return empty string ""), and break the content down into 2 to 4 manageable micro-tasks. 
       Return ONLY a valid JSON object with fields: "deadline" (string) and "tasks" (array of objects with "name" (string) and "points" (number: 1, 2, or 3)).`
 
       const response = await ai.models.generateContent({
@@ -364,29 +291,29 @@ function App() {
         selected: true
       }))
 
-      setPdfBreakdownItems(formattedItems)
-      setPdfDeadline(extractedDeadline)
-      setMessage(`PDF analyzed by Gemini! Deadline found: ${extractedDeadline}`)
+      setFileBreakdownItems(formattedItems)
+      setFileDeadline(extractedDeadline)
+      setMessage(`File analyzed by Gemini! Deadline found: ${extractedDeadline || 'None specified'}`)
     } catch (error) {
       console.error(error)
-      setPdfBreakdownItems([
-        { id: 'sub-1', name: `Research & outline for ${file.name}`, category: category, points: 2, selected: true },
-        { id: 'sub-2', name: `Draft core sections of ${file.name}`, category: category, points: 3, selected: true },
-        { id: 'sub-3', name: `Review and finalize ${file.name}`, category: category, points: 1, selected: true }
+      setFileBreakdownItems([
+        { id: 'sub-1', name: `Review & outline ${file.name}`, category: category, points: 2, selected: true },
+        { id: 'sub-2', name: `Complete core work for ${file.name}`, category: category, points: 3, selected: true },
+        { id: 'sub-3', name: `Final review and submit`, category: category, points: 1, selected: true }
       ])
-      setPdfDeadline(selectedDate)
+      setFileDeadline(selectedDate)
       setMessage('Analyzed with fallback template. Review tasks below.')
     } finally {
-      setIsAnalyzingPdf(false)
+      setIsAnalyzingFile(false)
     }
   }
 
-  function togglePdfItem(id) {
-    setPdfBreakdownItems(prev => prev.map(item => item.id === id ? { ...item, selected: !item.selected } : item))
+  function toggleFileItem(id) {
+    setFileBreakdownItems(prev => prev.map(item => item.id === id ? { ...item, selected: !item.selected } : item))
   }
 
-  function addPdfBreakdownTasks() {
-    const selectedItems = pdfBreakdownItems.filter(item => item.selected)
+  function addFileBreakdownTasks() {
+    const selectedItems = fileBreakdownItems.filter(item => item.selected)
     if (selectedItems.length === 0) {
       setMessage('Please select at least one task to add.')
       return
@@ -411,14 +338,14 @@ function App() {
         points: item.points,
         startTime: formattedStart,
         endTime: formattedEnd,
-        deadline: pdfDeadline || selectedDate,
+        deadline: fileDeadline || selectedDate,
         fixed: false,
         done: false
       }
     })
 
     saveTasks([...tasks, ...newTasks])
-    setPdfBreakdownItems([])
+    setFileBreakdownItems([])
     setMessage(`Smart-scheduled ${newTasks.length} micro-tasks across consecutive days!`)
     navigate('dashboard')
   }
@@ -487,23 +414,6 @@ function App() {
     }
   })
 
-  const [theme, setTheme] = useState(() => {
-    try {
-      const saved = localStorage.getItem('timo-theme')
-      return Object.hasOwn(themes, saved) ? saved : 'purple'
-    } catch {
-      return 'purple'
-    }
-  })
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('timo-theme', theme)
-    } catch {
-      /* Optional storage. */
-    }
-  }, [theme])
-
   const [background, setBackground] = useState(() => {
     try {
       const saved = localStorage.getItem('timo-background')
@@ -525,6 +435,8 @@ function App() {
   }, [background])
 
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [aiSuggestion, setAiSuggestion] = useState(null)
+  const [loadingSuggestion, setLoadingSuggestion] = useState(false)
 
   const totalLoad = loads.reduce(
     (total, load) => total + load.points,
@@ -533,48 +445,36 @@ function App() {
 
   const overload = Math.max(0, totalLoad - dailyCapacity)
 
-  const suggestion = suggestAIAdjustment(
-    tasks,
-    selectedDate,
-    dailyCapacity,
-    today
-  )
-
   function acceptSuggestion() {
-    if (!suggestion) return
+    if (!aiSuggestion) return
 
     saveTasks(
       tasks.map(task =>
-        task.id === suggestion.task.id
-          ? { ...task, date: suggestion.destination }
+        task.id === aiSuggestion.task.id
+          ? { ...task, date: aiSuggestion.destination }
           : task
       )
     )
 
     setMessage(
-      `${suggestion.task.name} moved to ${parseDate(
-        suggestion.destination
+      `${aiSuggestion.task.name} moved to ${parseDate(
+        aiSuggestion.destination
       ).toLocaleDateString('en', { dateStyle: 'medium' })}.`
     )
 
     setShowSuggestions(false)
-    setTradingTask(null)
   }
 
-  const chartTotal = Math.max(totalLoad, dailyCapacity, 1)
+  async function handleSkipSuggestion() {
+    if (!aiSuggestion) return
+    const nextSkipped = [...skippedTaskIds, aiSuggestion.task.id]
+    setSkippedTaskIds(nextSkipped)
 
-  const donutSlices = loads.map((load, index) => {
-    const start = loads
-      .slice(0, index)
-      .reduce((sum, item) => sum + item.points, 0)
-
-    return `${load.color} ${(start / chartTotal) * 100
-      }% ${((start + load.points) / chartTotal) * 100}%`
-  })
-
-  const donutBackground = `conic-gradient(${donutSlices.join(
-    ', '
-  )}, var(--border) ${(totalLoad / chartTotal) * 100}% 100%)`
+    setLoadingSuggestion(true)
+    const res = await suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, nextSkipped)
+    setAiSuggestion(res)
+    setLoadingSuggestion(false)
+  }
 
   const date = parseDate(selectedDate).toLocaleDateString('en', {
     weekday: 'long',
@@ -584,54 +484,62 @@ function App() {
   })
 
   const [message, setMessage] = useState('')
-  const [storageError, setStorageError] = useState(false)
 
   const [aiRecommendation, setAiRecommendation] = useState(null)
   const [showFlowchartWarning, setShowFlowchartWarning] = useState(false)
 
   useEffect(() => {
-    const totalLoad = dayTasks.reduce((sum, task) => sum + Number(task.points), 0)
-    const overload = Math.max(0, totalLoad - dailyCapacity)
+    async function fetchAiInsight() {
+      const currentLoad = dayTasks.reduce((sum, task) => sum + Number(task.points), 0)
+      const currentOverload = Math.max(0, currentLoad - dailyCapacity)
 
-    if (overload > 0) {
-      const userState = {
-        mentalFatigue: dayTasks.length > 3 || selectedMood === 'Stressed' || selectedMood === 'Anxious',
-        energyLevel: selectedMood,
-        upcomingTasks: dayTasks,
-      }
+      if (currentOverload > 0) {
+        try {
+          const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY })
+          const prompt = `You are Timo, an empathetic AI productivity companion. 
+The user's mood is "${selectedMood}" and they are overloaded today with ${currentLoad} points against a capacity of ${dailyCapacity} points. Their tasks are: ${JSON.stringify(dayTasks.map(t => t.name))}.
+Give a short, warm, comforting insight (1-2 sentences max) and explicitly recommend a quick, refreshing break activity (such as stepping out for a walk, grabbing a warm coffee, doing a 5-minute breathing exercise, or listening to a favorite song) to help them reset. Make it a fresh perspective.`
 
-      const evaluation = evaluateUserStatus(userState)
-      const scheduleCheck = processScheduleCheck(userState.upcomingTasks)
+          const response = await ai.models.generateContent({
+            model: 'gemini-3.5-flash-lite',
+            contents: [prompt],
+          })
 
-      if (evaluation.recommendation) {
-        setAiRecommendation(evaluation.recommendation)
-        setShowFlowchartWarning(true)
-      } else if (scheduleCheck.suggestion) {
-        setAiRecommendation(scheduleCheck.suggestion)
-        setShowFlowchartWarning(true)
+          const text = response.text.trim()
+          setAiRecommendation(text)
+          setShowFlowchartWarning(true)
+        } catch (error) {
+          console.error("Gemini insight error:", error)
+          setAiRecommendation("Your schedule looks quite packed today. Want to shuffle a few things around so you don't burn out?")
+          setShowFlowchartWarning(true)
+        }
       } else {
         setShowFlowchartWarning(false)
       }
-    } else {
-      setShowFlowchartWarning(false)
     }
-  }, [selectedMood, dayTasks, dailyCapacity])
+
+    fetchAiInsight()
+  }, [selectedDate, dailyCapacity])
 
   function saveTasks(nextTasks) {
     setTasks(nextTasks)
 
     try {
       localStorage.setItem('timo-tasks', JSON.stringify(nextTasks))
-      setStorageError(false)
     } catch {
-      setStorageError(true)
+      // Storage fallback handled silently
     }
   }
+
+  const totalTasksCount = dayTasks.length
+  const completedTasksCount = dayTasks.filter(t => t.done).length
+  const completionPercentage = totalTasksCount > 0 ? (completedTasksCount / totalTasksCount) * 100 : 0
+  const completionDonutBackground = `conic-gradient(var(--accent-dark) 0% ${completionPercentage}%, var(--border) ${completionPercentage}% 100%)`
 
   return (
     <main
       className="dashboard"
-      data-theme={theme}
+      data-theme="purple"
       style={{ paddingBottom: '6rem' }}
     >
       <header className="topbar">
@@ -675,13 +583,15 @@ function App() {
               setSelectedDate(day)
               setMessage('')
               setShowSuggestions(false)
-              navigate('dashboard')
+              setAiSuggestion(null)
+              setSkippedTaskIds([])
+              navigate('planner')
             }}
           />
         </>
       )}
 
-      {page === 'companion' && <AICompanion />}
+      {page === 'companion' && <AICompanion initialMessage={companionInitialMessage} />}
 
       {page === 'profile' && <Profile />}
 
@@ -689,57 +599,63 @@ function App() {
         <section className="task-section">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
             <h1 style={{ fontSize: '1.4rem', margin: 0 }}>{editingId ? "Edit task" : "Add a little task"}</h1>
-            <button type="button" className="back-button" onClick={() => navigate("dashboard")}>Cancel</button>
+            <button type="button" className="back-button" onClick={() => navigate("planner")}>Cancel</button>
           </div>
           <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>Planning for {date}</p>
 
           {!editingId && (
-            <div style={{ 
-              padding: '1rem 0', 
-              marginBottom: '0.5rem', 
-              borderBottom: '1px solid var(--border, #e2d9ed)' 
+            <div style={{
+              padding: '1rem 0',
+              marginBottom: '0.5rem',
+              borderBottom: '1px solid var(--border, #e2d9ed)'
             }}>
-              <div style={{ 
-                border: '1.5px dashed var(--accent, #d8c4ef)', 
-                padding: '1rem', 
+              <div style={{
+                border: '1.5px dashed var(--accent, #d8c4ef)',
+                padding: '1rem',
                 borderRadius: '12px',
                 background: 'rgba(216, 196, 239, 0.08)'
               }}>
                 <h3 style={{ fontSize: '0.95rem', margin: '0 0 0.3rem 0', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <span>✨</span> Got a heavy assignment PDF or syllabus?
+                  <span>✨</span> Upload any document, syllabus, photo, or notes
                 </h3>
                 <p style={{ fontSize: '0.85rem', color: 'var(--muted, #666)', marginBottom: '0.75rem', lineHeight: 1.4 }}>
-                  Upload it here to preview, set your deadline, and break it into pieces across days.
+                  Upload PDFs, images (screenshots), Word docs, or text files to auto-extract deadlines and break them into micro-tasks.
                 </p>
 
                 <label style={{ display: 'inline-block', background: 'var(--accent, #d8c4ef)', color: 'var(--accent-dark, #5a3e7a)', padding: '0.45rem 0.9rem', borderRadius: '8px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>
-                  {isAnalyzingPdf ? 'Reading PDF...' : '📄 Upload Assignment PDF'}
-                  <input type="file" accept=".pdf,.txt,.doc,.docx" onChange={handlePdfUpload} style={{ display: 'none' }} disabled={isAnalyzingPdf} />
+                  {isAnalyzingFile ? 'Analyzing file...' : 'Upload File or Image'}
+                  <input
+                    type="file"
+                    accept=".pdf,.txt,.doc,.docx,image/*,.csv"
+                    onChange={handleFileUpload}
+                    style={{ display: 'none' }}
+                    disabled={isAnalyzingFile}
+                  />
                 </label>
 
-                {pdfBreakdownItems.length > 0 && (
+                {fileBreakdownItems.length > 0 && (
                   <div style={{ marginTop: '1rem', background: '#fff', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
                     <h4 style={{ fontSize: '0.85rem', margin: '0 0 0.5rem 0' }}>Review Breakdown & Target Deadline:</h4>
-                    
+
                     <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.75rem', fontWeight: 600 }}>
                       Target Deadline:
-                      <input 
-                        type="date" 
+                      <input
+                        type="date"
                         min={selectedDate}
-                        value={pdfDeadline} 
-                        onChange={e => setPdfDeadline(e.target.value)} 
-                        style={{ display: 'block', marginTop: '0.2rem', padding: '0.4rem', width: '100%', borderRadius: '6px', border: '1px solid var(--border)' }} 
+                        value={fileDeadline}
+                        onChange={e => setFileDeadline(e.target.value)}
+                        style={{ display: 'block', marginTop: '0.2rem', padding: '0.4rem', width: '100%', borderRadius: '6px', border: '1px solid var(--border)' }}
                       />
                     </label>
 
-                    {pdfBreakdownItems.map(item => (
+                    {fileBreakdownItems.map(item => (
                       <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', marginBottom: '0.4rem', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={item.selected} onChange={() => togglePdfItem(item.id)} />
+                        <input type="checkbox" checked={item.selected} onChange={() => toggleFileItem(item.id)} />
                         <span>{item.name} <strong>({item.points} pts)</strong></span>
                       </label>
                     ))}
-                    
-                    <button type="button" className="primary-button" style={{ marginTop: '0.75rem', width: '100%', fontSize: '0.85rem', padding: '0.5rem' }} onClick={addPdfBreakdownTasks}>
+
+                    <button type="button" className="primary-button" style={{ marginTop: '0.75rem', width: '100%', fontSize: '0.85rem', padding: '0.5rem' }} onClick={addFileBreakdownTasks}>
                       ✨ Smart-Schedule Tasks Across Days
                     </button>
                   </div>
@@ -806,14 +722,14 @@ function App() {
                 />
               </label>
             </div>
-            
+
             <label>
               Deadline (optional)
               <input type="date" min={selectedDate} value={deadline} onChange={e => setDeadline(e.target.value)} />
             </label>
 
             <label className="fixed-toggle" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', cursor: 'pointer', margin: '0.5rem 0 1rem 0' }}>
-              <input type="checkbox" checked={fixed} onChange={e => setFixed(e.target.checked)} /> 
+              <input type="checkbox" checked={fixed} onChange={e => setFixed(e.target.checked)} />
               Fixed commitment — keep this task on its planned day
             </label>
 
@@ -828,203 +744,110 @@ function App() {
         </section>
       )}
 
-      {page === 'planner' && <Planner date={selectedDate} today={today} tasks={dayTasks} onDate={day => { setSelectedDate(day); setMessage(''); setShowSuggestions(false) }} onEdit={(task) => {/* handle edit if needed */}} onAdd={() => navigate('add-task')} onToggle={(task) => { saveTasks(tasks.map(t => t.id === task.id ? { ...t, done: !t.done } : t)); setMessage(task.done ? 'Marked unfinished.' : 'Task completed.') }} />}
+      {page === 'planner' && (
+        <Planner
+          date={selectedDate}
+          today={today}
+          tasks={tasks}
+          navigate={navigate} // ✅ Add this line here
+          onDate={day => {
+            setSelectedDate(day);
+            setMessage('');
+            setShowSuggestions(false);
+            setAiSuggestion(null);
+            setSkippedTaskIds([]);
+          }}
+          onEdit={(task) => {
+            setSelectedDate(task.date)
+            navigate('add-task')
+          }}
+          onRemove={(task) => {
+            saveTasks(tasks.filter(item => item.id !== task.id))
+            setMessage(`${task.name} removed.`)
+          }}
+          onAdd={() => navigate('add-task')}
+          onToggle={(task) => {
+            saveTasks(tasks.map(t => t.id === task.id ? { ...t, done: !t.done } : t));
+            setMessage(task.done ? 'Marked unfinished.' : 'Task completed.');
+          }}
+          showSuggestions={showSuggestions}
+          setShowSuggestions={async (val) => {
+            setShowSuggestions(val)
+            if (val && !aiSuggestion) {
+              setLoadingSuggestion(true)
+              const res = await suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, skippedTaskIds)
+              setAiSuggestion(res)
+              setLoadingSuggestion(false)
+            }
+          }}
+          suggestion={aiSuggestion}
+          acceptSuggestion={acceptSuggestion}
+          onSkipSuggestion={handleSkipSuggestion}
+          overload={overload}
+          loadingSuggestion={loadingSuggestion}
+          currentPoints={totalLoad}
+          maxCapacity={dailyCapacity}
+          selectedMood={selectedMood}
+          setSelectedMood={setSelectedMood}
+          moods={moods}
+          aiRecommendation={aiRecommendation}
+          showFlowchartWarning={showFlowchartWarning}
+          onOpenCompanion={() => {
+            setCompanionInitialMessage("Hey Timo, I saw your insight about my workload today. Can we talk more about it?")
+            navigate('companion')
+          }}
+        />
+      )}
 
       {page === 'dashboard' && (
         <>
           <div className="intro">
-            <p className="eyebrow">{date}</p>
-            <h1>A little room to breathe.</h1>
-            <p>Make a little space for the day ahead.</p>
+            <p className="eyebrow">Daily Summary • {date}</p>
+            <h1>Your daily snapshot.</h1>
+            <p>Review your energy and progress below.</p>
           </div>
-
-          {showFlowchartWarning && (
-            <section
-              className="warning"
-              aria-labelledby="flowchart-warning-title"
-              style={{
-                background: 'var(--accent-light, #f4effa)',
-                border: '1px solid var(--accent, #d8c4ef)',
-                borderRadius: '16px',
-                padding: '1rem 1.25rem',
-                display: 'flex',
-                gap: '1rem',
-                alignItems: 'flex-start',
-                marginBottom: '1.5rem'
-              }}
-            >
-              <span
-                className="warning-icon"
-                aria-hidden="true"
-                style={{
-                  background: 'var(--accent, #d8c4ef)',
-                  color: 'var(--accent-dark, #5a3e7a)',
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1rem',
-                  flexShrink: 0,
-                  fontWeight: 'bold'
-                }}
-              >
-                💬
-              </span>
-              <div>
-                <h2 id="flowchart-warning-title" style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 0.2rem 0', color: 'var(--ink)' }}>
-                  Timo's Insight
-                </h2>
-                <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--muted, #555)', lineHeight: 1.4 }}>
-                  {aiRecommendation}
-                </p>
-              </div>
-            </section>
-          )}
 
           <section
             className="capacity-card"
             aria-labelledby="capacity-title"
           >
             <div className="card-heading">
-              <h2 id="capacity-title">Planned load</h2>
+              <h2 id="capacity-title">Today's Progress</h2>
 
               <span
                 className="capacity-label"
                 style={{
-                  background:
-                    overload > 0 ? '#fde8e8' : 'var(--accent)',
-                  color:
-                    overload > 0 ? '#c53030' : 'var(--accent-dark)',
+                  background: 'var(--accent)',
+                  color: 'var(--accent-dark)',
                   padding: '0.4rem 0.85rem',
                   borderRadius: '20px',
                   fontWeight: 700,
                   fontSize: '0.85rem',
-                  border: `1px solid ${overload > 0
-                    ? '#fbc5c5'
-                    : 'var(--accent-dark)'
-                    }`,
+                  border: '1px solid var(--accent-dark)',
                   boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
                   letterSpacing: '-0.2px',
                 }}
               >
-                {overload > 0
-                  ? '⚠️ Over capacity'
-                  : '💚 Within capacity'}
+                {completedTasksCount} of {totalTasksCount} completed
               </span>
             </div>
 
             <div
-              className="mood-feedback-container"
-              style={{
-                margin: '1rem 0',
-                textAlign: 'left',
-              }}
-            >
-              <label
-                style={{
-                  display: 'block',
-                  fontWeight: 600,
-                  marginBottom: '0.5rem',
-                }}
-              >
-                How are you feeling today?
-              </label>
-
-              <div
-                className="mood-options"
-                style={{
-                  display: 'flex',
-                  gap: '0.75rem',
-                  justifyContent: 'space-between',
-                }}
-              >
-                {moods.map(m => (
-                  <button
-                    type="button"
-                    key={m.label}
-                    onClick={() => setSelectedMood(m.label)}
-                    style={{
-                      background:
-                        selectedMood === m.label
-                          ? 'var(--accent, #d8c4ef)'
-                          : 'transparent',
-                      border:
-                        '1px solid var(--border, #ccc)',
-                      borderRadius: '12px',
-                      padding: '0.5rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      flex: 1,
-                    }}
-                  >
-                    <span style={{ fontSize: '1.5rem' }}>
-                      {m.icon}
-                    </span>
-
-                    <span
-                      style={{
-                        fontSize: '0.75rem',
-                        marginTop: '0.25rem',
-                      }}
-                    >
-                      {m.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <p
-                style={{
-                  fontSize: '0.75rem',
-                  color: 'var(--muted, #666)',
-                  textAlign: 'center',
-                  marginTop: '0.5rem',
-                  marginBottom: '0.8rem'
-                }}
-              >
-                Your energy sets your daily capacity: Stressed (5 pts) to Great (12 pts).
-              </p>
-            </div>
-
-            <div
               className="capacity-donut"
-              style={{ background: donutBackground }}
+              style={{ background: completionDonutBackground }}
               role="img"
-              aria-label={`${totalLoad} points planned against ${dailyCapacity} points of capacity.`}
+              aria-label={`${completedTasksCount} tasks done out of ${totalTasksCount} total tasks today.`}
             >
               <div className="donut-center" aria-hidden="true">
                 <div className="capacity-number">
-                  {totalLoad}
-                  <span> / {dailyCapacity}</span>
+                  {completedTasksCount}
+                  <span> / {totalTasksCount}</span>
                 </div>
 
                 <p className="capacity-caption">
-                  points planned
+                  tasks done
                 </p>
               </div>
-            </div>
-
-            <div className="donut-legend" aria-hidden="true">
-              {loads.map(load => (
-                <span
-                  key={load.name}
-                  style={{
-                    color: 'var(--ink)',
-                    fontWeight: 500,
-                  }}
-                >
-                  <i
-                    style={{
-                      background: load.color,
-                      border: '1px solid rgba(0,0,0,0.15)',
-                    }}
-                  />
-                  {load.name}
-                </span>
-              ))}
             </div>
 
             <div className="load-section" style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border, #e2d9ed)', paddingTop: '1rem' }} aria-labelledby="load-title">
@@ -1086,236 +909,6 @@ function App() {
               + Add task
             </button>
           </nav>
-
-          <p className="selected-day" aria-live="polite">
-            {selectedDate === today ? 'Today' : date} ·{' '}
-            {dayTasks.length} tasks
-          </p>
-
-          <section
-            className="task-section"
-            aria-labelledby="tasks-title"
-          >
-            <h2 id="tasks-title">
-              Tasks for{' '}
-              {selectedDate === today ? 'today' : date}
-            </h2>
-
-            <p className="helper" role="status">
-              {message}
-            </p>
-
-            {storageError && (
-              <p role="alert">
-                Your browser could not save these tasks. They
-                may be lost when you refresh.
-              </p>
-            )}
-
-            {dayTasks.length === 0 ? (
-              <p className="helper">
-                A fresh start. Use + Add task to plan this
-                day.
-              </p>
-            ) : (
-              <ul className="task-list">
-                {dayTasks.map(task => {
-                  const points = Number(task.points);
-                  const isHeavy = points === 3;
-                  const isMedium = points === 2;
-
-                  const effortLabel = isHeavy ? 'Heavy' : isMedium ? 'Medium' : 'Light';
-                  const badgeBg = isHeavy ? '#fed7d7' : isMedium ? '#feebc8' : 'var(--accent-light, #edf2f7)';
-                  const badgeColor = isHeavy ? '#9b2c2c' : isMedium ? '#975a16' : 'inherit';
-
-                  return (
-                    <li key={task.id} style={{
-                      borderLeft: isHeavy ? '4px solid #e53e3e' : '4px solid transparent',
-                      paddingLeft: '1.25rem'
-                    }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <strong>{task.name}</strong>
-                          <span className="effort-badge" style={{ background: badgeBg, color: badgeColor }}>
-                            {effortLabel}
-                          </span>
-                        </div>
-                        <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.2rem' }}>
-                          🕒 {task.startTime} – {task.endTime} · {task.category} · {points} {points === 1 ? 'point' : 'points'}
-                        </p>
-                      </div>
-
-                      <button type="button" className="remove-task" onClick={() => startTrade(task)} aria-label={`Reschedule ${task.name}`}>Reschedule</button>
-                      <button type="button" className="remove-task" aria-label={`Remove ${task.name}`} onClick={() => { saveTasks(tasks.filter(item => item.id !== task.id)); setMessage(`${task.name} removed.`); }}>Remove</button>
-
-                      {tradingTask === task.id && (
-                        <form
-                          className="trade-form"
-                          onSubmit={event =>
-                            tradeTask(event, task)
-                          }
-                        >
-                          <label
-                            htmlFor={`trade-${task.id}`}
-                          >
-                            Move to another day
-                          </label>
-
-                          <input
-                            id={`trade-${task.id}`}
-                            type="date"
-                            required
-                            value={tradeDate}
-                            onChange={event =>
-                              setTradeDate(event.target.value)
-                            }
-                          />
-
-                          {validDate(tradeDate) && (
-                            <p className="helper">
-                              Destination load:{' '}
-                              {tasksForDay(
-                                tasks,
-                                tradeDate
-                              ).reduce(
-                                (sum, item) =>
-                                  sum + Number(item.points),
-                                0
-                              ) +
-                                (tradeDate === task.date
-                                  ? 0
-                                  : Number(task.points))}{' '}
-                              / {dailyCapacity} points after
-                              moving.
-                            </p>
-                          )}
-
-                          <div className="page-actions">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setTradingTask(null)
-                              }
-                            >
-                              Cancel
-                            </button>
-
-                            <button
-                              type="submit"
-                              disabled={
-                                !validDate(tradeDate) ||
-                                tradeDate === task.date
-                              }
-                            >
-                              Move task
-                            </button>
-                          </div>
-                        </form>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-
-          <button
-            className="primary-button"
-            aria-expanded={showSuggestions}
-            aria-controls="suggestions"
-            onClick={() =>
-              setShowSuggestions(!showSuggestions)
-            }
-          >
-            {showSuggestions
-              ? 'Hide suggestions'
-              : 'Lighten My Load'}
-
-            <span aria-hidden="true">
-              {showSuggestions ? '−' : '↗'}
-            </span>
-          </button>
-
-          <section
-            id="suggestions"
-            className="suggestions"
-            hidden={!showSuggestions}
-          >
-            <h2>A little breathing room</h2>
-
-            {suggestion ? (
-              <>
-                <p>
-                  Timo suggests moving{' '}
-                  <strong>
-                    {suggestion.task.name}
-                  </strong>{' '}
-                  ({suggestion.task.startTime}–
-                  {suggestion.task.endTime}) to{' '}
-                  <strong>
-                    {parseDate(
-                      suggestion.destination
-                    ).toLocaleDateString('en', {
-                      weekday: 'long',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </strong>
-                  .
-                </p>
-
-                <div className="move-preview">
-                  <p>
-                    This day:{' '}
-                    <strong>
-                      {suggestion.sourceBefore} →{' '}
-                      {suggestion.sourceAfter} pts
-                    </strong>
-                  </p>
-
-                  <p>
-                    New day:{' '}
-                    <strong>
-                      {suggestion.destinationBefore} →{' '}
-                      {suggestion.destinationAfter} pts
-                    </strong>
-                  </p>
-                </div>
-
-                <p>
-                  {suggestion.remaining === 0
-                    ? 'This brings both days within your estimated capacity.'
-                    : `This frees up ${suggestion.task.points} points, leaving ${suggestion.remaining} points above your estimate on this day.`}
-                </p>
-
-                <div className="page-actions">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowSuggestions(false)
-                    }
-                  >
-                    Keep my plan
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={acceptSuggestion}
-                  >
-                    Yes, move task
-                  </button>
-                </div>
-              </>
-            ) : (
-              <p>
-                {selectedDate < today
-                  ? 'This is a past day. Choose today or a future date to adjust your plan.'
-                  : overload === 0
-                    ? 'Your plan is within your estimated capacity. Keep some room for breaks.'
-                    : 'Timo could not find a task that can be moved within the next 7 days.'}
-              </p>
-            )}
-          </section>
         </>
       )}
 
