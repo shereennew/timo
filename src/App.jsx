@@ -40,7 +40,25 @@ async function suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, sk
   if (selectedDate < today) return null
 
   const currentTasks = tasksForDay(tasks, selectedDate)
-  const totalLoad = currentTasks.reduce((sum, task) => sum + Number(task.points), 0)
+  const loads = categories.map(cat => {
+    const matching = currentTasks.filter(
+      task => task.category === cat.name && !task.done
+    )
+
+    return {
+      ...cat,
+      points: matching.reduce(
+        (sum, task) => sum + Number(task.points),
+        0
+      ),
+      detail: `${matching.length} ${matching.length === 1 ? 'task' : 'tasks'} planned`,
+    }
+  })
+
+  const totalLoad = loads.reduce(
+    (total, load) => total + load.points,
+    0
+  )
 
   if (totalLoad <= dailyCapacity) return null
 
@@ -239,6 +257,17 @@ function App() {
   }, [tasks])
 
   const dayTasks = tasksForDay(tasks, selectedDate)
+
+  // Energy calculations
+  const plannedPoints = dayTasks.reduce((sum, t) => sum + Number(t.points), 0)
+  const completedPoints = dayTasks
+    .filter(t => t.done)
+    .reduce((sum, t) => sum + Number(t.points), 0)
+
+  const remainingEnergy = Math.max(0, dailyCapacity - plannedPoints + completedPoints)
+  const fillPercentage = Math.min(100, (remainingEnergy / dailyCapacity) * 100)
+  const isOverloaded = plannedPoints > dailyCapacity
+  const barColor = isOverloaded ? '#e53e3e' : fillPercentage < 25 ? '#dd6b20' : '#28a745'
 
   const [isAnalyzingFile, setIsAnalyzingFile] = useState(false)
   const [fileBreakdownItems, setFileBreakdownItems] = useState([])
@@ -749,7 +778,7 @@ Give a short, warm, comforting insight (1-2 sentences max) and explicitly recomm
           date={selectedDate}
           today={today}
           tasks={tasks}
-          navigate={navigate} // ✅ Add this line here
+          navigate={navigate}
           onDate={day => {
             setSelectedDate(day);
             setMessage('');
@@ -787,6 +816,10 @@ Give a short, warm, comforting insight (1-2 sentences max) and explicitly recomm
           loadingSuggestion={loadingSuggestion}
           currentPoints={totalLoad}
           maxCapacity={dailyCapacity}
+          remainingEnergy={remainingEnergy}
+          fillPercentage={fillPercentage}
+          barColor={barColor}
+          isOverloaded={isOverloaded}
           selectedMood={selectedMood}
           setSelectedMood={setSelectedMood}
           moods={moods}
