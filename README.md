@@ -21,12 +21,12 @@ Feature list:
 4. Energy capacity measurement
 5. Capacity and Workload Dashboard
 6. Adaptive Planner
-7. AI chatbot
+7. AI chatbot  
 
+These are the features going to be implemented into the app.
 
 2. Ideation & Process  
 2.1 Ideas We Considered  
-Table of every distinct idea generated, with why each was kept or dropped, order it so that chosen ideas are listed first
 
 | Idea | Why it was dropped/kept |
 | ---- | ----------------------- |
@@ -36,35 +36,37 @@ Table of every distinct idea generated, with why each was kept or dropped, order
 | Timo | Chosen because the features targets what problems stakeholders are facing and present the solution to their issues in a simplified way to tackle it |
 
 2.2 Ideation Boards  
+
 Mindmaps  
 2nd draft  
 <img width="891" height="1271" alt="2nd draft" src="https://github.com/user-attachments/assets/b97f3a92-8b1f-4e82-a7bf-5dd8574854d9" />  
 Draft of Interactive Avatar-Based Student Stress & Task Management. Scribbles and doodles are avatar drafts.
 
-final draft  
+Final draft  
 <img width="1280" height="944" alt="final draft" src="https://github.com/user-attachments/assets/7b452329-1dbc-4560-ae3a-c081d929f4f0" />
-Finalized mindmaps of the final features.  
+Finalized mindmaps of the final features.    
+
 
 Feature Flowcharts  
-<img width="1861" height="911" alt="login, logout, signup drawio" src="https://github.com/user-attachments/assets/48c0471a-48a8-4f98-89ca-afe40667be09" />
-Usual login and logout. First-time registration will have to answer a short quiz to determine energy capacity. Energy capacity will be different for every user.  
+<img width="1861" height="911" alt="login, logout, signup drawio" src="https://github.com/user-attachments/assets/48c0471a-48a8-4f98-89ca-afe40667be09" /><br>
+Usual login and logout. First-time registration will have to answer a short quiz to determine energy capacity. Energy capacity will be different for every user.   
 
-<img width="597" height="1451" alt="smart workload manager drawio" src="https://github.com/user-attachments/assets/997b7822-55a6-4f70-93c8-4d722025c912" />
+<img width="597" height="1451" alt="smart workload manager drawio" src="https://github.com/user-attachments/assets/997b7822-55a6-4f70-93c8-4d722025c912" /> <br>
 User can upload documents (e.g. assignment guidelines) to AI and it'll automatically extract details to create a schedule for the user. User can also modify the generated tasks before saving it into the schedule.  
 
-<img width="467" height="1362" alt="popup notification" src="https://github.com/user-attachments/assets/f7eab4fb-0d57-45c9-a185-f1d2f536e6f5" />
+<img width="467" height="1362" alt="popup notification" src="https://github.com/user-attachments/assets/f7eab4fb-0d57-45c9-a185-f1d2f536e6f5" /><br>
 Popup notification occurs when the user opens the app for the first time of the day to ask about their energy status for the day. There are notifications for reminders that a task is about to start and a quick check-in if the user is doing the task or would like to postpone said task.  
 
-<img width="862" height="1751" alt="codenection-Overload intervenetion  drawio" src="https://github.com/user-attachments/assets/caf77e76-bc78-43ba-90b6-1b645e0b6806" />
+<img width="862" height="1751" alt="codenection-Overload intervenetion  drawio" src="https://github.com/user-attachments/assets/caf77e76-bc78-43ba-90b6-1b645e0b6806" /><br>
 If the user's workload capacity is overloaded, the app will schedule a rest task. If therer's no available time, the app will instead ask if the user would like to postpone some tasks to rest.  
 
-<img width="439" height="928" alt="capacity and workload dashboard" src="https://github.com/user-attachments/assets/532b1794-ceb8-484b-b2de-e57d50bec2cf" />
+<img width="439" height="928" alt="capacity and workload dashboard" src="https://github.com/user-attachments/assets/532b1794-ceb8-484b-b2de-e57d50bec2cf" /><br>
 Users can view their energy capacity, today's task and schedule, workload summary and categories.  
 
-<img width="423" height="1591" alt="adaptive planner" src="https://github.com/user-attachments/assets/082018b9-7dba-42b9-a5c3-2325f69de15a" />
+<img width="423" height="1591" alt="adaptive planner" src="https://github.com/user-attachments/assets/082018b9-7dba-42b9-a5c3-2325f69de15a" /><br>
 User can add their own tasks in whichever category they prefer and if there are conflicts, the app will ask the user if they'd like to trade a low priority task with another on a different day.  
 
-<img width="491" height="1007" alt="recovery assistant" src="https://github.com/user-attachments/assets/62b03569-32c6-441a-855c-84a8c9789624" />
+<img width="491" height="1007" alt="recovery assistant" src="https://github.com/user-attachments/assets/62b03569-32c6-441a-855c-84a8c9789624" /><br>
 The app will track the user's energy capacity and trigger different responses by recommending suitable rest and relaxing activities based on the remaining capacity.  
 
 
@@ -97,7 +99,7 @@ Existing productivity apps mainly help users organize what they need to do. Our 
 Tech stack  
 | Component | Technology | Purpose | 
 | --------- | ---------- | ------- |
-| Frontend | Andriod Studio + Kotlin + Jetpack Compose | Build the Android mobile application with a modern, responsive UI |
+| Frontend | Android Studio + Kotlin + Jetpack Compose | Build the Android mobile application with a modern, responsive UI |
 | Backend | Firebase Cloud Functions | Handles backend logic and securely communicates with external APIs |
 | Database | Firebase Firestore | Stores user accounts, tasks, schedules, check-ins, capacity data and points. Easy to integrate with Android |
 | Authentication | Firebase Authentication | Provides secure user registration and login without building authentication from scratch |
@@ -109,7 +111,7 @@ Expected Constraints:
 1. Gemini - AI-generated tasks and deadlines may be inaccurate so users can review and edit generatee tasks before saving them
 2. Firebase - Free-tier limits may restrict storage and usage during development
 3. Smartwatch - Health data availability depends on the user's device and permissions so the app must still work without a smartwatch
-4. Developement time - To remain feasible, advanced smartwatch integration will be treated as secondary if time is limited
+4. Development time - To remain feasible, advanced smartwatch integration will be treated as secondary if time is limited
 
 System architecture diagram  
 
@@ -117,7 +119,6 @@ System architecture diagram
 
 Build plan & scope  
 Phase 1 - Core Workload Management  
-Build:
 1. User registration/login
 2. Smart workload document upload
 3. Gemini extraction and task decomposition
@@ -126,22 +127,20 @@ Build:
 6. Capacity and Workload Dashboard
 
 Phase 2 - Adaptive Capacity System  
-Build:  
 1. Initial stress quiz during user registration
 2. Daily check-ins
 3. Dynamic energy capacity calculation
 4. Workload category tracking
 5. Capacity status:
-  a. 80-100%: stable
-  b. 60-79&: need a break
-  c. 30-59%: danger
-  d. 0-29%: code red
+    - 80-100%: stable
+    - 60-79%: need a break
+    - 30-59%: danger
+    - 0-29%: code red
 6. Overload Intervention
 7. Recovery recommendations
 8. Adaptive Planner
 
 Phase 3 - Supporting Features  
-Build:  
 1. Activity reminders and check-ins
 2. Health connect/smartwatch integration
 
