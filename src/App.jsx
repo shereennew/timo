@@ -129,7 +129,14 @@ async function suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, sk
 function App() {
   const [page, setPage] = useState('planner')
 
-  function navigate(nextPage) {
+  function navigate(nextPage, editing = false) {
+    if (nextPage === 'add-task') {
+      setMessage('')
+      if (!editing) {
+        setEditingId(null); setTaskName(''); setCategory('Academic'); setEffort('1')
+        setStartTime('09:00'); setEndTime('10:00'); setDeadline(''); setFixed(false)
+      }
+    }
     setPage(nextPage)
     window.scrollTo(0, 0)
   }
@@ -137,7 +144,16 @@ function App() {
   const today = dateKey(new Date())
 
   const [selectedDate, setSelectedDate] = useState(today)
-  const [selectedMood, setSelectedMood] = useState('Good')
+  const [dailyMoods, setDailyMoods] = useState(() => {
+    try { const saved = JSON.parse(localStorage.getItem('timo-daily-moods') || '{}'); return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {} } catch { return {} }
+  })
+  const selectedMood = moods.some(m => m.label === dailyMoods[selectedDate]) ? dailyMoods[selectedDate] : 'Okay'
+  function setSelectedMood(value) {
+    setDailyMoods(previous => ({ ...previous, [selectedDate]: value }))
+  }
+  useEffect(() => {
+    try { localStorage.setItem('timo-daily-moods', JSON.stringify(dailyMoods)) } catch { /* Keep the current session usable. */ }
+  }, [dailyMoods])
   const [skippedTaskIds, setSkippedTaskIds] = useState([])
   const [companionInitialMessage, setCompanionInitialMessage] = useState('')
 
@@ -403,27 +419,23 @@ function App() {
       return
     }
 
-    saveTasks([
-      ...tasks,
-      {
-        id: crypto.randomUUID(),
-        name,
-        category,
-        date: selectedDate,
-        points: Number(effort),
-        startTime,
-        endTime,
-        deadline,
-        fixed,
-      },
-    ])
+    if (!validDate(selectedDate) || (deadline && deadline < selectedDate)) {
+      setMessage('Choose a planned date on or before the deadline.')
+      return
+    }
+    const changes = { name, category, date: selectedDate, points: Number(effort), startTime, endTime, deadline, fixed }
+    saveTasks(editingId
+      ? tasks.map(task => task.id === editingId ? { ...task, ...changes } : task)
+      : [...tasks, { id: crypto.randomUUID(), ...changes, done: false }])
+    const wasEditing = Boolean(editingId)
+    setEditingId(null)
 
     setTaskName('')
     setStartTime('09:00')
     setEndTime('10:00')
     setDeadline('')
     setFixed(false)
-    setMessage(`${name} added.`)
+    setMessage(`${name} ${wasEditing ? 'updated' : 'added'}.`)
 
     navigate('dashboard')
   }
@@ -443,6 +455,12 @@ function App() {
     }
   })
 
+  const [theme, setTheme] = useState(() => {
+    try { const saved = localStorage.getItem('timo-theme'); return Object.hasOwn(themes, saved) ? saved : 'purple' } catch { return 'purple' }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('timo-theme', theme) } catch { /* Keep the current session usable. */ }
+  }, [theme])
   const [background, setBackground] = useState(() => {
     try {
       const saved = localStorage.getItem('timo-background')
@@ -568,7 +586,7 @@ Give a short, warm, comforting insight (1-2 sentences max) and explicitly recomm
   return (
     <main
       className="dashboard"
-      data-theme="purple"
+      data-theme={theme}
       style={{ paddingBottom: '6rem' }}
     >
       <header className="topbar">
@@ -622,7 +640,7 @@ Give a short, warm, comforting insight (1-2 sentences max) and explicitly recomm
 
       {page === 'companion' && <AICompanion initialMessage={companionInitialMessage} />}
 
-      {page === 'profile' && <Profile />}
+      {page === 'profile' && <Profile theme={theme} setTheme={setTheme} background={background} setBackground={setBackground} />}
 
       {page === 'add-task' && (
         <section className="task-section">
@@ -732,6 +750,7 @@ Give a short, warm, comforting insight (1-2 sentences max) and explicitly recomm
               </label>
             </div>
 
+            <label>Planned date<input type="date" required value={selectedDate} onChange={e => setSelectedDate(e.target.value)} /></label>
             <div className="task-fields">
               <label>
                 Start time
@@ -788,13 +807,26 @@ Give a short, warm, comforting insight (1-2 sentences max) and explicitly recomm
           }}
           onEdit={(task) => {
             setSelectedDate(task.date)
-            navigate('add-task')
+            setEditingId(task.id)
+            setTaskName(task.name)
+            setCategory(task.category)
+            setEffort(String(task.points))
+            setStartTime(task.startTime || '')
+            setEndTime(task.endTime || '')
+            setDeadline(task.deadline || '')
+            setFixed(Boolean(task.fixed))
+            setMessage('')
+            navigate('add-task', true)
           }}
           onRemove={(task) => {
             saveTasks(tasks.filter(item => item.id !== task.id))
             setMessage(`${task.name} removed.`)
           }}
-          onAdd={() => navigate('add-task')}
+          onAdd={() => {
+            setEditingId(null); setTaskName(''); setCategory('Academic'); setEffort('1')
+            setStartTime('09:00'); setEndTime('10:00'); setDeadline(''); setFixed(false)
+            navigate('add-task')
+          }}
           onToggle={(task) => {
             saveTasks(tasks.map(t => t.id === task.id ? { ...t, done: !t.done } : t));
             setMessage(task.done ? 'Marked unfinished.' : 'Task completed.');
