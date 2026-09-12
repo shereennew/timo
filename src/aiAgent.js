@@ -1,16 +1,12 @@
 import { GoogleGenAI } from '@google/genai';
 import { dateKey, parseDate, tasksForDay } from './planning';
 
-// Initialize the Gemini client using Vite environment variables
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 const MODEL_NAME = 'gemini-3.5-flash-lite';
 
-/**
- * 1. Analyzes an uploaded file (syllabus, document, photo) to extract deadlines and micro-tasks.
- */
 export async function analyzeFileWithAI(filePart, category, selectedDate) {
     try {
-        const prompt = `Analyze this uploaded assignment document, syllabus, image, or notes sheet. Extract any stated submission deadline or due date (format strictly as YYYY-MM-DD if found, otherwise return empty string ""), and break the content down into 2 to 4 manageable micro-tasks. 
+        const prompt = `Analyze this uploaded assignment document, syllabus, image, or notes sheet. Extract any stated submission deadline or due date (format strictly as YYYY-MM-DD if found, otherwise return empty string ""), and break the content down into 2 to 4 manageable micro-tasks.
     Return ONLY a valid JSON object with fields: "deadline" (string) and "tasks" (array of objects with "name" (string) and "points" (number: 1, 2, or 3)).`;
 
         const response = await ai.models.generateContent({
@@ -27,9 +23,6 @@ export async function analyzeFileWithAI(filePart, category, selectedDate) {
     }
 }
 
-/**
- * 2. Suggests an intelligent workload adjustment when the user is overloaded.
- */
 export async function suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, skippedTaskIds = []) {
     if (selectedDate < today) return null;
 
@@ -52,8 +45,8 @@ export async function suggestAIAdjustment(tasks, selectedDate, dailyCapacity, to
     }
 
     try {
-        const prompt = `You are Timo, an empathetic AI productivity companion. 
-    The user is overloaded on ${selectedDate}. 
+        const prompt = `You are Timo, an empathetic AI productivity companion.
+    The user is overloaded on ${selectedDate}.
     Available tasks to choose from on this day: ${JSON.stringify(eligibleTasks)}
     Total load: ${totalLoad} points. Daily capacity limit: ${dailyCapacity} points.
     Upcoming available days load profile over next 7 days: ${JSON.stringify(upcomingContext)}
@@ -104,9 +97,6 @@ export async function suggestAIAdjustment(tasks, selectedDate, dailyCapacity, to
     }
 }
 
-/**
- * 3. Generates a comforting daily insight message based on user mood and overload status.
- */
 export async function getDailyInsight(selectedMood, dayTasks, dailyCapacity) {
     const currentLoad = dayTasks.reduce((sum, task) => sum + Number(task.points), 0);
     const currentOverload = Math.max(0, currentLoad - dailyCapacity);
@@ -114,7 +104,7 @@ export async function getDailyInsight(selectedMood, dayTasks, dailyCapacity) {
     if (currentOverload <= 0) return null;
 
     try {
-        const prompt = `You are Timo, an empathetic AI productivity companion. 
+        const prompt = `You are Timo, an empathetic AI productivity companion.
     The user's mood is "${selectedMood}" and they are overloaded today with ${currentLoad} points against a capacity of ${dailyCapacity} points. Their tasks are: ${JSON.stringify(dayTasks.map(t => t.name))}.
     Give a short, warm, comforting insight (1-2 sentences max) and explicitly recommend a quick, refreshing break activity to help them reset.`;
 
@@ -130,69 +120,393 @@ export async function getDailyInsight(selectedMood, dayTasks, dailyCapacity) {
     }
 }
 
-/**
- * 4. Handles chat agent messaging with Tool Use (Function Calling) enabled.
- */
-export async function sendAgentMessage(messages, filePart = null, fileName = null) {
+function pushScheduleSummary(contents, fileContext) {
+    if (fileContext?.scheduleSummary && fileContext?.today) {
+        contents.push(`\n--- USER SCHEDULE (next 14 days) ---`);
+        contents.push(JSON.stringify(fileContext.scheduleSummary, null, 2));
+        contents.push(`--- END SCHEDULE ---`);
+        contents.push(`Today is ${fileContext.today}.`);
+    }
+}
+
+export async function sendAgentMessage(messages, fileContext = null) {
     try {
         const systemInstruction = `
-You are Timo, a warm and concise productivity companion. 
-Rules for your answers:
-1. Be direct and concise. 
-2. When the user asks for specific information (like free time, a single task, or a deadline), provide ONLY that information. Do not dump the entire schedule or unrequested details unless explicitly asked.
-3. When a file is attached, acknowledge its filename (e.g., "${fileName}") and provide a clear, bulleted breakdown of the tasks or key points found inside.
-4. Keep your tone encouraging, helpful, and natural.
-5. Be direct and provide only the specific information requested.
-6. When answering or breaking down information, you MUST use clean Markdown bullet points (- or *). 
-7. CRITICAL: Every single bullet point must start on a brand new line. Never put inline asterisks or collapse bullet points into a single paragraph block.
-`;
+You are Timo, a warm, concise, and helpful productivity companion.
 
-        const contents = [systemInstruction];
+GENERAL RULES:
+
+1. Be direct, concise, encouraging, and natural.
+
+2. Always understand the user's message and intent before answering.
+
+3. If the user asks for specific information, provide ONLY the information requested.
+   Do not provide unrelated information or the entire schedule unless explicitly asked.
+
+4. When one or more files are attached, consider BOTH:
+   - the content of the uploaded files
+   - the user's message and request
+
+5. The user's explicit request ALWAYS takes priority over the default file action.
+
+FILE HANDLING:
+
+6. When files are attached, first analyze the actual file content to determine each
+   file's main purpose. Do NOT classify a file based only on its filename.
+
+7. If a file is mainly a LECTURE SLIDE:
+   - If the user gave NO specific request (default mode), create clear and simple
+     study notes organized by topic:
+       ## <Topic 1>
+       - key point
+       ## <Topic 2>
+       - key point
+     Extract main topics, key concepts, definitions, examples.
+     Start with: "📚 I detected this as a lecture slide, so I'll turn it into study notes."
+   - If the user gave a SPECIFIC request (e.g. "explain chapter 3 in simple words"),
+     do NOT produce full notes. Briefly classify the file in one line, then answer
+     ONLY what the user asked.
+   - If the user's request includes scheduling keywords (plan, schedule, arrange,
+     study plan, quiz prep, exam prep), ALSO follow Rule 24 and output a revision
+     planner JSON at the end.
+
+8. If a file is mainly an ASSIGNMENT:
+   - If the user gave NO specific request (default mode), produce a PROFESSIONAL,
+     LOGICAL breakdown:
+     a. Group by TASK TYPE, not by exercise number or page count.
+        Valid types: setup, comprehension, drafting, verification, submission, research.
+     b. Each task must have a CLEAR DELIVERABLE. No vague tasks.
+     c. Each task should be 20-90 minutes of focused work. Do not split below 20 min.
+     d. Do not split by artificial boundaries ("Exercises 1-4", "page 1-3").
+     e. Include a verification task when the assignment is testable.
+     f. Include a submission task only if the file mentions submission or sharing.
+     g. Task counts: lab/tutorial = 3-5; essay/report = 4-6; large project = 5-7.
+        Never exceed 7 tasks.
+     h. Order tasks respecting dependencies.
+     i. Do NOT write the student's answers or deliverables. Only structure.
+     Start with: "📝 I detected this as an assignment, so I'll break it down into smaller tasks."
+
+   - If the user gave a SPECIFIC request (e.g. "only tell me what to submit",
+     "help me do Task 2"), do NOT produce the full breakdown. Briefly classify
+     the file in one line, then answer ONLY what the user asked.
+
+   Examples of GOOD breakdowns:
+     Lab (LaTeX, ~2 h):
+       - Set up Overleaf project and create blank project         [setup, 30 min]
+       - Study text formatting and special characters (Ex 2-4)    [comprehension, 30 min]
+       - Apply fonts, spacing, symbols to test document (Ex 5-12) [drafting, 40 min]
+       - Customize margins and verify all exercises compile       [verification, 20 min]
+       - Share project with peer and export final PDF             [submission, 10 min]
+     Essay (1500 words, ~5 h):
+       - Read prompt and rubric, list thesis and 3 arguments      [comprehension, 45 min]
+       - Gather 5 sources and take notes with citations           [research, 90 min]
+       - Draft body paragraphs                                    [drafting, 90 min]
+       - Write intro and conclusion                               [drafting, 45 min]
+       - Revise argument flow, then proofread                     [verification, 45 min]
+       - Format citations and submit                              [submission, 30 min]
+
+   Examples of BAD breakdowns (do NOT do this):
+     - "Complete Exercises 1-4"         (groups unrelated content by number)
+     - "Read the instructions (5 min)"  (too small, not a real unit of work)
+     - "Do the assignment"              (no deliverable, no structure)
+     - One task per exercise             (artificial boundary)
+     - "Set up and complete everything" (everything in one task)
+
+9. If the user's request is clear, do not ask unnecessary clarification questions.
+
+10. If a file is neither clearly a lecture slide nor an assignment:
+    - Follow the user's request if one is provided.
+    - If there is no clear request, briefly explain what the file appears to contain
+      and ask what the user would like Timo to do.
+
+USER INTENT PRIORITY:
+
+11. Follow this priority order:
+    A. User's explicit request
+    B. Content of the uploaded files
+    C. Default file action
+
+12. Never ignore a user's request just because a file is classified as a
+    lecture slide or assignment.
+
+13. If the user asks for something different from the default action, follow the
+    user's request.
+
+14. If the user asks for a specific section, chapter, question, task, or topic,
+    focus ONLY on that part.
+
+MARKDOWN:
+
+15. Always use clean Markdown formatting.
+
+16. Every bullet point MUST start on a brand-new line.
+
+17. Never put multiple bullet points on the same line.
+
+18. Keep explanations suitable for a university student, using simple and natural language.
+
+19. Do not use unnecessarily advanced vocabulary or overly formal language.
+
+WORKLOAD-AWARE SCHEDULING (only when a schedule summary is provided):
+
+20. You will sometimes be given the user's schedule for the next 14 days.
+    Each day has: date, points (workload), capacity (comfortable limit),
+    taskCount, hasFixed, taskNames.
+
+    When you break down an ASSIGNMENT, do NOT split it blindly. Instead:
+
+    a. Work out how many hours the assignment needs and how many days remain
+       until the deadline (daysUntilDeadline).
+
+    b. Look at the schedule summary. Find the days with the LOWEST points
+       (most free). Those are the best candidates for the assignment tasks.
+
+    c. If NO day has enough free capacity before the deadline, you MUST:
+       - Say so plainly: "⚠️ Your next X days are quite packed."
+       - Suggest ONE specific trade-off, e.g.:
+         "Wednesday has 11 pts (overloaded) and you have a test on Thursday.
+          I suggest moving 'Read chapter 3' (2 pts) from Wednesday to Saturday.
+          That would free up enough room for the assignment draft on Wednesday."
+       - Only suggest ONE clean trade-off per turn. Do not rewrite the whole week.
+
+    d. If a day is overloaded and the assignment is due soon, be direct:
+       "You may need to drop or postpone something. Here's what I'd suggest: ..."
+
+    e. When suggesting a trade-off, reference the task by NAME. Do NOT invent tasks
+       that are not in the summary.
+
+    f. If no schedule summary is provided, skip this rule entirely.
+
+DIFFICULTY MAPPING:
+
+21. Use ONLY these three difficulty values, mapping to the user's points system:
+    - "light"  = 1 point  (~20-40 min)
+    - "medium" = 2 points (~45 min - 1.5 h)
+    - "heavy"  = 3 points (2 h+)
+    The overall assignment difficulty is the difficulty of the WHOLE assignment,
+    not of an individual task.
+
+MULTIPLE FILES:
+
+22. When MULTIPLE files are attached:
+    - Consider them TOGETHER as a single context.
+    - If they belong to the same assignment (e.g. brief + rubric + sample),
+      merge them into ONE analysis, not separate analyses.
+    - If they are clearly different (e.g. a lecture slide + an assignment),
+      briefly acknowledge each, then focus on what the user asked.
+    - Start with a one-line summary like: "I've read N files: <name1>, <name2>..."
+    - Never produce separate planner JSON blocks. Only ONE planner JSON at the end.
+    - If the user gave no specific request, default to whichever file is an
+      ASSIGNMENT (do the breakdown). Lecture slides become supporting notes.
+
+PLANNER JSON (ONLY in default mode for ASSIGNMENTS):
+
+23. At the END of your reply, output ONE fenced JSON block with this shape:
+
+    \`\`\`json
+    {
+      "difficulty": "light" | "medium" | "heavy",
+      "totalEffort": "~X h",
+      "taskCount": 5,
+      "deadline": "YYYY-MM-DD" | "",
+      "daysUntilDeadline": 8,
+      "recommendedId": "split3",
+      "scheduleNote": {
+        "type": "fits" | "tight" | "conflict",
+        "message": "1-3 sentences",
+        "suggestedMoves": [
+          { "taskName": "...", "fromDate": "YYYY-MM-DD", "toDate": "YYYY-MM-DD", "reason": "..." }
+        ]
+      },
+      "plannerOptions": [
+        {
+          "id": "single",
+          "label": "Do it all at once",
+          "tasks": [
+            { "title": "...", "type": "drafting", "points": 3, "effort": "~2 h" }
+          ]
+        },
+        {
+          "id": "split3",
+          "label": "Split into 3 sessions",
+          "tasks": [
+            { "title": "...", "type": "setup", "points": 1, "effort": "~30 min" },
+            { "title": "...", "type": "drafting", "points": 2, "effort": "~45 min" },
+            { "title": "...", "type": "verification", "points": 1, "effort": "~20 min" }
+          ]
+        }
+      ]
+    }
+    \`\`\`
+
+    Requirements:
+    - "difficulty": see Rule 21. Use light / medium / heavy only.
+    - "totalEffort": rough total time, e.g. "~6 h".
+    - "taskCount": number of tasks in the recommended split.
+    - "deadline": YYYY-MM-DD or "" if not found.
+    - "daysUntilDeadline": integer or null if no deadline.
+    - "recommendedId": the id of the option you recommend. Must match an option id.
+    - "scheduleNote": OPTIONAL. Only include it when a schedule summary was provided.
+        type = "fits" if the assignment fits comfortably
+        type = "tight" if it barely fits
+        type = "conflict" if something needs to move
+    - "plannerOptions": 2 to 3 alternatives. ALWAYS include:
+        - "single" - one task covering the whole assignment
+        - at least one "splitN" - 2 to 5 tasks following Rule 8
+        - optionally a finer split for heavy assignments
+    - Each task must have: title, type, points (1/2/3), effort.
+    - Points must follow Rule 21.
+    - Do NOT output this JSON when the user gave a specific request.
+    - Keep human-readable analysis ABOVE the JSON block.
+
+FILE CLASSIFICATION OPENER:
+
+- If a lecture slide is detected AND no specific user request overrides the default,
+  start with: "📚 I detected this as a lecture slide, so I'll turn it into study notes."
+- If an assignment is detected AND no specific user request overrides the default,
+  start with: "📝 I detected this as an assignment, so I'll break it down into smaller tasks."
+- If the user has given a specific request, respond directly to that request without
+  forcing the default opener.
+
+REVISION PLAN JSON (for LECTURE SLIDES when the user asks for scheduling):
+
+24. When the user uploads lecture slides AND asks for scheduling help
+    (words like "arrange", "plan", "schedule", "study plan", "quiz prep",
+    "exam prep", "test prep"), you MUST ALSO output a revision planner JSON
+    block at the END of your reply, in the SAME shape as Rule 23.
+
+    For revision plans:
+
+    Step 1 — Count usable days.
+      If a schedule summary is provided, count USABLE days between today and
+      the deadline. A usable day = a day where current points < capacity.
+      If no schedule summary is provided, count the calendar days between today
+      and the deadline (assume all days are usable).
+
+    Step 2 — Decide granularity based on usable days AND number of major topics.
+      Let N = number of major topics in the slides.
+      Let U = usable days.
+      - If U <= 2          → produce 1-2 tasks (single or split2).
+      - If 3 <= U <= N     → produce U tasks, roughly one topic per day.
+      - If U > N           → produce N+1 tasks (topics split further if needed),
+                             but never more than 7.
+      - If U is large and N is small → still cap at 7 tasks max.
+
+    Step 3 — Group by TOPIC, not by slide number.
+
+    Step 4 — Produce 3 to 4 plannerOptions:
+      - "single"       — one task covering the whole revision
+      - "split2"       — 2 balanced chunks
+      - "splitN"       — one topic per day (N = number of major topics)
+      - optionally "topic-by-topic" — every major topic listed separately
+
+    Step 5 — recommendedId:
+      - If U >= N and N >= 3 → recommend the "one topic per day" split.
+      - If U is 1-2          → recommend "single" or "split2".
+      - Otherwise            → recommend the "splitN" closest to U.
+
+    Other fields:
+    - "difficulty" = overall difficulty of the exam material.
+    - "deadline" = the quiz/exam date if it can be inferred, else "".
+    - "daysUntilDeadline" = integer or null.
+    - "scheduleNote" = include if a schedule summary was provided AND the days
+      before the deadline are overloaded. Follow Rule 20c-e for the message
+      and suggestedMoves.
+
+    Points mapping for revision tasks: ~30 min = 1, ~1 h = 2, 2 h+ = 3.
+    Task types: "comprehension", "research", "drafting", "verification".
+
+    JSON shape (identical to Rule 23):
+
+    \`\`\`json
+    {
+      "difficulty": "light" | "medium" | "heavy",
+      "totalEffort": "~X h",
+      "taskCount": N,
+      "deadline": "YYYY-MM-DD" | "",
+      "daysUntilDeadline": N | null,
+      "recommendedId": "splitN",
+      "scheduleNote": { ... },
+      "plannerOptions": [
+        { "id": "single",  "label": "...", "tasks": [ { "title": "...", "type": "...", "points": 1, "effort": "~30 min" } ] },
+        { "id": "split2",  "label": "...", "tasks": [ ... ] },
+        { "id": "splitN",  "label": "...", "tasks": [ ... ] }
+      ]
+    }
+    \`\`\`
+
+    Requirements:
+    - If the user did NOT ask for scheduling (e.g. just "make notes"), do NOT
+      output this JSON. Rule 7 (pure notes mode) applies instead.
+    - Only output ONE JSON block per reply, ever.
+    - If both an assignment and lecture slides are attached and the user
+      asked about scheduling, prioritise the ASSIGNMENT for the JSON block,
+      and treat the lecture notes as supporting content.
+    - CRITICAL: Even if your analysis is long, you MUST include the fenced JSON
+      block at the end. Replies without the JSON block are considered failures.
+`.trim()
+
+        const contents = [systemInstruction]
 
         for (const msg of messages) {
-            contents.push(`${msg.role === 'user' ? 'User' : 'Timo'}: ${msg.content}`);
+            contents.push(`${msg.role === 'user' ? 'User' : 'Timo'}: ${msg.content}`)
         }
 
-        if (filePart) {
-            if (fileName) {
-                contents.push(`User attached file: ${fileName}`);
+        if (fileContext?.kind === 'text') {
+            contents.push(`User attached file: ${fileContext.fileName}`)
+            contents.push(
+                `\n--- FILE CONTENT START ---\n${fileContext.text.slice(0, 40000)}\n--- FILE CONTENT END ---`
+            )
+            pushScheduleSummary(contents, fileContext)
+        } else if (fileContext?.kind === 'image') {
+            contents.push(`User attached image: ${fileContext.fileName}`)
+            contents.push(fileContext.filePart)
+            pushScheduleSummary(contents, fileContext)
+        } else if (fileContext?.kind === 'multi') {
+            contents.push(`User attached ${fileContext.files.length} file(s):`)
+            for (const f of fileContext.files) {
+                if (f.kind === 'text') {
+                    contents.push(`\n=== FILE: ${f.fileName} (text) ===`)
+                    contents.push(`--- CONTENT START ---\n${(f.text || '').slice(0, 30000)}\n--- CONTENT END ---`)
+                } else if (f.kind === 'image') {
+                    contents.push(`\n=== FILE: ${f.fileName} (image) ===`)
+                    contents.push(f.filePart)
+                }
             }
-            contents.push(filePart);
+            pushScheduleSummary(contents, fileContext)
         }
 
         const response = await ai.models.generateContent({
             model: MODEL_NAME,
-            contents: contents,
+            contents,
             config: {
                 tools: [{
-                    functionDeclarations: [
-                        {
-                            name: 'create_task',
-                            description: 'Create a new task in the user planner schedule.',
-                            parameters: {
-                                type: 'OBJECT',
-                                properties: {
-                                    name: { type: 'STRING', description: 'The title of the task' },
-                                    category: { type: 'STRING', enum: ['Academic', 'Work', 'Social'] },
-                                    points: { type: 'NUMBER', description: '1 for light, 2 for medium, 3 for heavy' },
-                                    date: { type: 'STRING', description: 'YYYY-MM-DD format' },
-                                    startTime: { type: 'STRING', description: 'HH:MM format, e.g. 14:00' },
-                                    endTime: { type: 'STRING', description: 'HH:MM format, e.g. 15:00' }
-                                },
-                                required: ['name', 'date', 'startTime', 'endTime']
-                            }
+                    functionDeclarations: [{
+                        name: 'create_task',
+                        description: 'Create a new task in the user planner schedule.',
+                        parameters: {
+                            type: 'OBJECT',
+                            properties: {
+                                name: { type: 'STRING', description: 'The title of the task' },
+                                category: { type: 'STRING', enum: ['Academic', 'Work', 'Social'] },
+                                points: { type: 'NUMBER', description: '1 light, 2 medium, 3 heavy' },
+                                date: { type: 'STRING', description: 'YYYY-MM-DD' },
+                                startTime: { type: 'STRING', description: 'HH:MM' },
+                                endTime: { type: 'STRING', description: 'HH:MM' }
+                            },
+                            required: ['name', 'date', 'startTime', 'endTime']
                         }
-                    ]
+                    }]
                 }]
             }
-        });
+        })
 
         return {
             text: response.text || null,
             functionCalls: response.functionCalls || []
-        };
+        }
     } catch (error) {
-        console.error("Agent chat error:", error);
-        throw error;
+        console.error('Agent chat error:', error)
+        throw error
     }
 }

@@ -66,9 +66,6 @@ function App() {
   function setSelectedMood(value) {
     setDailyMoods(previous => ({ ...previous, [selectedDate]: value }))
   }
-  useEffect(() => {
-    try { localStorage.setItem('timo-daily-moods', JSON.stringify(dailyMoods)) } catch { /* ignore */ }
-  }, [dailyMoods])
 
   const [skippedTaskIds, setSkippedTaskIds] = useState([])
   const [companionInitialMessage, setCompanionInitialMessage] = useState('')
@@ -76,10 +73,34 @@ function App() {
     { role: 'assistant', content: "Hey there! 🌿 I'm Timo. What are we working on today? Feel free to drop a question, paste some text, or just tell me what's on your mind!" }
   ])
 
-  const [reschedulingTask, setReschedulingTask] = useState(null)
-  const [rescheduleDate, setRescheduleDate] = useState(today)
-  const [rescheduleStartTime, setRescheduleStartTime] = useState('09:00')
-  const [rescheduleEndTime, setRescheduleEndTime] = useState('10:00')
+  useEffect(() => {
+    function handleMessage(event) {
+      if (event.origin !== 'http://localhost:5174') return
+      const data = event.data
+      if (!data || data.type !== 'timo:attach-file') return
+
+      try {
+        const binary = atob(data.base64)
+        const bytes = new Uint8Array(binary.length)
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i)
+        }
+
+        const file = new File([bytes], data.name, { type: data.mime })
+
+       setCompanionMessages(prev => [
+  ...prev,
+  { role: 'user', content: '', silent: true, pendingFile: file }
+])
+        setPage('companion')
+      } catch (err) {
+        console.error('[timo] attach-file error', err)
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [])
 
   const dailyCapacity = moods.find(m => m.label === selectedMood)?.points || 8
 
@@ -139,7 +160,9 @@ function App() {
       if (tasks.some(task => task.id.startsWith('example-v1-'))) {
         localStorage.setItem('timo-examples-v1', 'added')
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [tasks])
 
   useEffect(() => {
@@ -504,7 +527,9 @@ function App() {
     setTasks(nextTasks)
     try {
       localStorage.setItem('timo-tasks', JSON.stringify(nextTasks))
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   const [selectedHealthMetric, setSelectedHealthMetric] = useState(null)

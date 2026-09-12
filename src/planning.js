@@ -8,7 +8,6 @@ export function parseDate(s) { const [y,m,d] = s.split('-').map(Number); return 
 export function validDate(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && dateKey(parseDate(s)) === s }
 export function tasksForDay(tasks, day) { return tasks.filter(t => t.date === day) }
 
-// Prefer one move that resolves overload, then the lightest destination.
 export function suggestMove(tasks, day, capacity, today, capacityForDay = () => capacity) {
   const source = tasksForDay(tasks, day)
   const total = source.reduce((sum, task) => sum + task.points, 0)
@@ -41,4 +40,24 @@ const minutes=t=>Number(t.slice(0,2))*60+Number(t.slice(3))
 export function conflicts(tasks,task) {
  if(!task.startTime||!task.endTime)return []
  return tasks.filter(t=>t.id!==task.id&&t.date===task.date&&t.startTime&&t.endTime&&minutes(task.startTime)<minutes(t.endTime)&&minutes(task.endTime)>minutes(t.startTime))
+}
+
+export function summarizeSchedule(tasks, today, daysAhead = 14, dailyCapacity = 8) {
+  const days = []
+  for (let i = 0; i < daysAhead; i++) {
+    const d = parseDate(today)
+    d.setDate(d.getDate() + i)
+    const key = dateKey(d)
+    const dayTasks = tasks.filter(t => t.date === key)
+    const points = dayTasks.reduce((s, t) => s + Number(t.points || 0), 0)
+    days.push({
+      date: key,
+      points,
+      capacity: dailyCapacity,
+      taskCount: dayTasks.length,
+      hasFixed: dayTasks.some(t => t.fixed),
+      taskNames: dayTasks.slice(0, 5).map(t => t.name),
+    })
+  }
+  return days
 }
