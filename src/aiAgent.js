@@ -6,8 +6,29 @@ const MODEL_NAME = 'gemini-3.5-flash-lite';
 
 export async function analyzeFileWithAI(filePart, category, selectedDate) {
     try {
-        const prompt = `Analyze this uploaded assignment document, syllabus, image, or notes sheet. Extract any stated submission deadline or due date (format strictly as YYYY-MM-DD if found, otherwise return empty string ""), and break the content down into 2 to 4 manageable micro-tasks.
-    Return ONLY a valid JSON object with fields: "deadline" (string) and "tasks" (array of objects with "name" (string) and "points" (number: 1, 2, or 3)).`;
+        const prompt = `Analyze this uploaded assignment document, syllabus, image, or notes sheet.
+
+Extract any stated submission deadline or due date. Format it strictly as YYYY-MM-DD if found, otherwise return an empty string "".
+
+Break the assignment into 3 to 7 clear, manageable tasks based on the actual work required.
+
+For each task:
+- "name": a clear task name with a specific deliverable
+- "points": 1, 2, or 3 based on effort
+  - 1 point = light, around 20-40 minutes
+  - 2 points = medium, around 45-90 minutes
+  - 3 points = heavy, around 2 hours or more
+
+Return ONLY a valid JSON object:
+{
+  "deadline": "YYYY-MM-DD",
+  "tasks": [
+    {
+      "name": "string",
+      "points": 1
+    }
+  ]
+}`;
 
         const response = await ai.models.generateContent({
             model: MODEL_NAME,
@@ -140,8 +161,39 @@ GENERAL RULES:
 
 2. Always understand the user's message and intent before answering.
 
-3. If the user asks for specific information, provide ONLY the information requested.
+3. If the user asks for specific information (like free time, a single task,
+   or a deadline), provide ONLY that information.
    Do not provide unrelated information or the entire schedule unless explicitly asked.
+
+3b. CRITICAL — Do NOT call the create_task function unless the user
+    EXPLICITLY asks you to ADD, SCHEDULE, CREATE, or BLOCK OUT time
+    for a specific task.
+
+    Questions like "when is my free time?", "what's on my schedule?",
+    "do I have any gaps?", or "how busy am I?" are INFORMATION REQUESTS,
+    NOT creation requests. Answer them with text only.
+
+    Only call create_task when the user uses verbs like:
+    add, schedule, create, put, block, book, plan, set up + a task description.
+
+    Examples:
+      - "Add a 30-min lunch break at 1pm"           -> call create_task
+      - "Schedule study time tomorrow morning"      -> call create_task
+      - "When is my free time?"                     -> answer with text, NO create_task
+      - "What gaps do I have today?"                -> answer with text, NO create_task
+      - "Am I free at 3pm?"                         -> answer with text, NO create_task
+
+3c. When the user asks about their FREE TIME or GAPS in their schedule:
+    - Look at the [Current Schedule for ...] context that is provided.
+    - Calculate the gaps between timed tasks.
+    - Answer with the specific free windows, e.g.:
+        "You're free from 12:00–14:00 and again from 17:30–21:00."
+    - Do NOT call create_task. This is an information request.
+    - If the day has no tasks, say the whole day is free.
+    - Only mention the specific date the user asked about (default: today
+      or the selected date in context).
+    - IMPORTANT: The schedule context only lists TIMED tasks. Tasks without
+      a startTime/endTime are unscheduled and don't block free time.
 
 4. When one or more files are attached, consider BOTH:
    - the content of the uploaded files
@@ -279,12 +331,22 @@ WORKLOAD-AWARE SCHEDULING (only when a schedule summary is provided):
 
 DIFFICULTY MAPPING:
 
-21. Use ONLY these three difficulty values, mapping to the user's points system:
+21. Use ONLY these three difficulty values:
     - "light"  = 1 point  (~20-40 min)
     - "medium" = 2 points (~45 min - 1.5 h)
     - "heavy"  = 3 points (2 h+)
-    The overall assignment difficulty is the difficulty of the WHOLE assignment,
-    not of an individual task.
+
+    These point values describe INDIVIDUAL TASKS.
+
+    For the overall assignment difficulty:
+    - First complete the task breakdown (Rule 8).
+    - Then calculate the total workload from all generated tasks.
+    - Consider total task points, total estimated effort, number of tasks,
+      and whether there are heavy or complex tasks.
+    - Do not determine overall difficulty from the assignment title alone.
+
+    The required order is:
+    Assignment → Task Breakdown → Task Points → Total Workload → Overall Difficulty.
 
 MULTIPLE FILES:
 
@@ -444,6 +506,53 @@ REVISION PLAN JSON (for LECTURE SLIDES when the user asks for scheduling):
       and treat the lecture notes as supporting content.
     - CRITICAL: Even if your analysis is long, you MUST include the fenced JSON
       block at the end. Replies without the JSON block are considered failures.
+
+SCHEDULING RECOMMENDATION:
+
+25. After outputting the planner JSON (Rule 23) or the revision planner JSON
+    (Rule 24), you may recommend a scheduling approach. BUT:
+
+    a. Recommend only. Do NOT call create_task yet.
+
+    b. Consider: total task points, total effort, number of tasks,
+       individual task effort, deadline, days remaining, task dependencies,
+       and the user's existing schedule capacity (if provided).
+
+    c. Valid recommendation ids:
+         - "single" - do the work in one scheduled session
+         - "splitN" - divide into multiple scheduled sessions
+         - "custom" - let the user decide
+
+    d. Recommend "single" ONLY when the full workload can reasonably fit into
+       one session without overloading a day.
+
+    e. Recommend splitting when:
+         - total workload is high
+         - there are several tasks
+         - there are multiple heavy tasks
+         - there are enough days before the deadline
+         - one session would exceed or nearly exceed daily capacity
+
+    f. If the deadline is close, prefer a tighter split that still respects
+       task dependencies and daily capacity.
+
+    g. Wait for the user's choice. When the user says something like
+       "add the recommended plan", "schedule the split plan", or
+       "do it all at once and add it", THEN call create_task for the selected
+       tasks.
+
+    h. If the exact schedule (dates/times) has not yet been confirmed,
+       show the proposed dates and times before creating tasks.
+
+    i. Never call create_task just because an assignment was uploaded or
+       because a planner option was generated.
+
+    Examples:
+      - "Which option do you recommend?"      -> recommend only, no create_task
+      - "Should I split this?"                -> recommend only, no create_task
+      - "Add the recommended plan."           -> call create_task
+      - "Schedule the split plan."            -> call create_task
+      - "Do it all at once and add it."       -> call create_task
 `.trim()
 
         const contents = [systemInstruction]
@@ -483,7 +592,7 @@ REVISION PLAN JSON (for LECTURE SLIDES when the user asks for scheduling):
                 tools: [{
                     functionDeclarations: [{
                         name: 'create_task',
-                        description: 'Create a new task in the user planner schedule.',
+                        description: 'Create a new task in the user planner schedule. ONLY call this when the user EXPLICITLY asks to add, schedule, create, or block out time for a task, OR when the user has just chosen a planner option and asked you to add it. Do NOT call it for questions like "when is my free time?", "what is on my schedule?", or "do I have any gaps?".',
                         parameters: {
                             type: 'OBJECT',
                             properties: {

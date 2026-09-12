@@ -564,34 +564,50 @@ function App() {
         </>
       )}
 
-      {page === 'companion' && (
-        <AICompanion
-          initialMessage={companionInitialMessage}
-          messages={companionMessages}
-          setMessages={setCompanionMessages}
-          tasks={tasks}
-          selectedDate={selectedDate}
-          dailyCapacity={dailyCapacity}
-          onTaskCreated={(newTaskData) => {
-            const newTask = {
-              id: crypto.randomUUID(),
-              name: newTaskData.name,
-              category: newTaskData.category || 'Academic',
-              points: Number(newTaskData.points) || 2,
-              date: newTaskData.date || today,
-              startTime: newTaskData.startTime || '09:00',
-              endTime: newTaskData.endTime || '10:00',
-              fixed: false,
-              done: false
-            }
-            saveTasks([...tasks, newTask])
-          }}
-          onTaskDeleted={(taskId) => saveTasks(tasks.filter(t => t.id !== taskId))}
-          onTaskUpdated={(updatedTask) =>
-            saveTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t))
-          }
-        />
-      )}
+{page === 'companion' && (
+  <AICompanion
+    initialMessage={companionInitialMessage}
+    messages={companionMessages}
+    setMessages={setCompanionMessages}
+    tasks={tasks}
+    selectedDate={selectedDate}
+    dailyCapacity={dailyCapacity}
+    onTaskCreated={(newTaskData) => {
+      const newTask = {
+        id: crypto.randomUUID(),
+        name: newTaskData.name,
+        category: newTaskData.category || 'Academic',
+        points: Number(newTaskData.points) || 2,
+        date: newTaskData.date || today,
+        startTime: newTaskData.startTime || '09:00',
+        endTime: newTaskData.endTime || '10:00',
+        fixed: false,
+        done: false
+      }
+
+      setTasks(prev => {
+        const next = [...prev, newTask]
+        try { localStorage.setItem('timo-tasks', JSON.stringify(next)) } catch {}
+        return next
+      })
+    }}
+    onTaskDeleted={(taskId) => {
+      setTasks(prev => {
+        const next = prev.filter(t => t.id !== taskId)
+        try { localStorage.setItem('timo-tasks', JSON.stringify(next)) } catch {}
+        return next
+      })
+    }}
+    onTaskUpdated={(updatedTask) => {
+      setTasks(prev => {
+        const next = prev.map(t => t.id === updatedTask.id ? updatedTask : t)
+        try { localStorage.setItem('timo-tasks', JSON.stringify(next)) } catch {}
+        return next
+      })
+    }}
+  />
+)}
+
 
       {page === 'profile' && <Profile theme={theme} setTheme={setTheme} background={background} setBackground={setBackground} />}
 

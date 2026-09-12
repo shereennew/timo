@@ -189,41 +189,73 @@ export default function AICompanion(props) {
     })
   }
 
-  function addTasksToPlanner(taskList) {
-    if (!props.onTaskCreated || taskList.length === 0) return
+function addTasksToPlanner(taskList) {
+  if (!props.onTaskCreated || taskList.length === 0) return
 
-    const allTasks = [...(props.tasks || [])]
+  const allTasks = [...(props.tasks || [])]
 
-    taskList.forEach(t => {
-      const points = t.points || 1
-      const durationMin = pointsToMinutes(points)
-      let dateToUse = t.date
-      let slot = findFreeSlot(allTasks, dateToUse, durationMin)
+  // 初始化 cursors：每天从"当天已存在的最晚 task 结束时间"开始
+  const cursors = {}
+  for (const t of allTasks) {
+    if (t.date && t.startTime && t.endTime) {
+      const endMin = timeToMinutes(t.endTime)
+      if (endMin === null) continue
+      cursors[t.date] = Math.max(cursors[t.date] ?? 0, endMin)
+    }
+  }
 
-      if (!slot) {
-        const next = new Date(dateToUse)
-        for (let i = 1; i <= 14 && !slot; i++) {
-          next.setDate(next.getDate() + 1)
-          const key = next.toISOString().split('T')[0]
-          slot = findFreeSlot(allTasks, key, durationMin)
-          if (slot) dateToUse = key
+  taskList.forEach(t => {
+    const points = t.points || 1
+    const durationMin = pointsToMinutes(points)
+    let dateToUse = t.date
+    let slot = null
+
+    for (let i = 0; i <= 14 && !slot; i++) {
+      const dayDate = new Date(dateToUse)
+      dayDate.setDate(dayDate.getDate() + i)
+      const key = dayDate.toISOString().split('T')[0]
+
+      let candidate = null
+      const startFrom = cursors[key]
+
+      if (startFrom !== null && startFrom !== undefined) {
+        const dayTasksEnd = allTasks
+          .filter(x => x.date === key && x.startTime && x.endTime)
+          .map(x => timeToMinutes(x.endTime))
+          .filter(x => x !== null)
+        const cursor = Math.max(startFrom, ...dayTasksEnd, 9 * 60)
+
+        if (cursor + durationMin <= 21 * 60) {
+          candidate = { start: cursor, end: cursor + durationMin }
         }
       }
 
-      if (!slot) slot = { start: 9 * 60, end: 9 * 60 + durationMin }
-
-      const newTask = {
-        name: t.title,
-        category: 'Academic',
-        points,
-        date: dateToUse,
-        startTime: minutesToTime(slot.start),
-        endTime: minutesToTime(slot.end),
+      if (!candidate) {
+        candidate = findFreeSlot(allTasks, key, durationMin)
       }
-      allTasks.push({ ...newTask, id: 'temp-' + Math.random() })
-      props.onTaskCreated(newTask)
-    })
-  }
+
+      if (candidate) {
+        slot = candidate
+        dateToUse = key
+      }
+    }
+
+    if (!slot) slot = { start: 9 * 60, end: 9 * 60 + durationMin }
+
+    const newTask = {
+      name: t.title,
+      category: 'Academic',
+      points,
+      date: dateToUse,
+      startTime: minutesToTime(slot.start),
+      endTime: minutesToTime(slot.end),
+    }
+
+    allTasks.push({ ...newTask, id: 'temp-' + Math.random() })
+    cursors[dateToUse] = slot.end
+    props.onTaskCreated(newTask)
+  })
+}
 
   function handleAddPlannerOption(option) {
     const baseDate = props.selectedDate || new Date().toISOString().split('T')[0]

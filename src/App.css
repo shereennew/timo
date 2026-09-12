@@ -1132,9 +1132,6 @@ footer {
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid var(--border, #e2dfec);
-<<<<<<< HEAD
-}
-=======
 }
 .completion-toggle, .fixed-toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; }
 .completion-toggle input, .task-form .fixed-toggle input { width: 20px; height: 20px; min-height: 20px; flex-shrink: 0; accent-color: var(--accent-dark); }
@@ -1753,4 +1750,3 @@ button.week-heading {
   margin: 6px 0 0 0;
   line-height: 1.4;
 }
->>>>>>> 29b24e169e2e5455ca523946378f949436e23b91
