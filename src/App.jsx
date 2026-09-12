@@ -36,8 +36,6 @@ const themes = {
   green: { label: 'Green', color: '#c5e4cd' },
 }
 
-<<<<<<< HEAD
-=======
 /* =========================
    FLOWCHART AI LOGIC EVALUATOR
    ========================= */
