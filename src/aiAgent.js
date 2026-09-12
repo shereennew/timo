@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { dateKey, parseDate, tasksForDay } from './planning';
 
 // Initialize the Gemini client using Vite environment variables
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });

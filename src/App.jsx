@@ -5,9 +5,8 @@ import BottomNav from './BottomNav'
 import AICompanion from './AICompanion'
 import Profile from './Profile'
 import Planner from './Planner'
-
 import { dateKey, parseDate, validDate, tasksForDay } from './planning'
-import { analyzeFileWithAI, suggestAIAdjustment, getDailyInsight } from './aiAgent';
+import { analyzeFileWithAI, suggestAIAdjustment, getDailyInsight } from './aiAgent'
 
 const categories = [
   { name: 'Academic', detail: 'Classes & assignment', points: 5, color: 'var(--chart-1)', icon: 'A' },
@@ -36,66 +35,10 @@ const themes = {
   green: { label: 'Green', color: '#c5e4cd' },
 }
 
-/* =========================
-   FLOWCHART AI LOGIC EVALUATOR
-   ========================= */
-
-function evaluateUserStatus(userState) {
-  const { energyLevel, upcomingTasks } = userState
-
-  if (energyLevel === 'Stressed') {
-    return {
-      recommendation: "You're feeling stressed today. Let's take things slow—how about scheduling a longer break?",
-      action: 'check_schedule',
-      tasks: upcomingTasks,
-    }
-  }
-
-  if (energyLevel === 'Anxious') {
-    return {
-      recommendation: "Anxiety can feel really overwhelming. Would you like to lighten your load or take a mindful pause?",
-      action: 'check_schedule',
-      tasks: upcomingTasks,
-    }
-  }
-
-  if (energyLevel === 'Okay') {
-    return {
-      recommendation: "You're cruising at an okay pace. A short break or some light activity might feel nice soon!",
-      action: 'check_schedule',
-      tasks: upcomingTasks,
-    }
-  }
-
-  if (energyLevel === 'Good' || energyLevel === 'Great') {
-    return {
-      recommendation: "You're radiating good energy today! Keep up the great balance.",
-      action: 'continue',
-      tasks: upcomingTasks,
-    }
-  }
-
-  return {
-    recommendation: "Keeping an eye on your energy—you're doing great!",
-    action: 'continue',
-    tasks: upcomingTasks,
-  }
-}
-
-function processScheduleCheck(tasks) {
-  const hasTooManyTasks = tasks && tasks.length > 3
-
-  if (hasTooManyTasks) {
-    return {
-      suggestion: "Your schedule looks quite packed today. Want to shuffle a few things around so you don't burn out?",
-      nextStep: "Monitor user's status & energy",
-    }
-  }
-
-  return {
-    suggestion: "Your schedule is looking balanced and manageable.",
-    nextStep: "Monitor user's status & energy",
-  }
+const healthData = {
+  steps: 6240,
+  sleepHours: 7.2,
+  exerciseMinutes: 42,
 }
 
 function App() {
@@ -128,16 +71,9 @@ function App() {
   }, [dailyMoods])
   const [skippedTaskIds, setSkippedTaskIds] = useState([])
   const [companionInitialMessage, setCompanionInitialMessage] = useState('')
-
   const [companionMessages, setCompanionMessages] = useState([
     { role: 'assistant', content: "Hey there! 🌿 I'm Timo. What are we working on today? Feel free to drop a question, paste some text, or just tell me what's on your mind!" }
   ])
-
-
-  const [reschedulingTask, setReschedulingTask] = useState(null)
-  const [rescheduleDate, setRescheduleDate] = useState(selectedDate)
-  const [rescheduleStartTime, setRescheduleStartTime] = useState('09:00')
-  const [rescheduleEndTime, setRescheduleEndTime] = useState('10:00')
 
   const dailyCapacity =
     moods.find(m => m.label === selectedMood)?.points || 8
@@ -257,18 +193,14 @@ function App() {
   const dayTasks = tasksForDay(tasks, selectedDate)
 
   // Energy calculations
-  const plannedPoints = dayTasks.reduce((sum, t) => sum + Number(t.points || 0), 0)
+  const plannedPoints = dayTasks.reduce((sum, t) => sum + Number(t.points), 0)
   const completedPoints = dayTasks
     .filter(t => t.done)
-    .reduce((sum, t) => sum + Number(t.points || 0), 0)
+    .reduce((sum, t) => sum + Number(t.points), 0)
 
-  const uncompletedPoints = dayTasks
-    .filter(t => !t.done)
-    .reduce((sum, t) => sum + Number(t.points || 0), 0)
-
-  const remainingEnergy = Math.max(0, dailyCapacity - uncompletedPoints)
+  const remainingEnergy = Math.max(0, dailyCapacity - plannedPoints + completedPoints)
   const fillPercentage = Math.min(100, (remainingEnergy / dailyCapacity) * 100)
-  const isOverloaded = uncompletedPoints > dailyCapacity
+  const isOverloaded = plannedPoints > dailyCapacity
   const barColor = isOverloaded ? '#e53e3e' : fillPercentage < 25 ? '#dd6b20' : '#28a745'
 
   const [isAnalyzingFile, setIsAnalyzingFile] = useState(false)
@@ -276,56 +208,56 @@ function App() {
   const [fileDeadline, setFileDeadline] = useState('')
 
   async function handleFileUpload(event) {
-    const file = event.target.files[0]
-    if (!file) return
+  const file = event.target.files[0]
+  if (!file) return
 
-    setIsAnalyzingFile(true)
-    setMessage(`Scanning and analyzing ${file.name} with Gemini...`)
+  setIsAnalyzingFile(true)
+  setMessage(`Scanning and analyzing ${file.name} with Gemini...`)
 
-    try {
-      const filePart = await new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onloadend = () => {
-          resolve({
-            inlineData: {
-              data: reader.result.split(',')[1],
-              mimeType: file.type || (file.name.endsWith('.txt') ? 'text/plain' : 'application/pdf')
-            }
-          })
-        }
-        reader.onerror = reject
-        reader.readAsDataURL(file)
-      })
+  try {
+    const filePart = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        resolve({
+          inlineData: {
+            data: reader.result.split(',')[1],
+            mimeType: file.type || (file.name.endsWith('.txt') ? 'text/plain' : 'application/pdf')
+          }
+        })
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
 
-      const parsedData = await analyzeFileWithAI(filePart, category, selectedDate)
+    const parsedData = await analyzeFileWithAI(filePart, category, selectedDate)
 
-      const breakdown = parsedData.tasks || []
-      const extractedDeadline = parsedData.deadline ? parsedData.deadline : selectedDate
+    const breakdown = parsedData.tasks || []
+    const extractedDeadline = parsedData.deadline ? parsedData.deadline : selectedDate
 
-      const formattedItems = breakdown.map((item, index) => ({
-        id: `sub-${index + 1}`,
-        name: item.name,
-        category: category,
-        points: Number(item.points) || 2,
-        selected: true
-      }))
+    const formattedItems = breakdown.map((item, index) => ({
+      id: `sub-${index + 1}`,
+      name: item.name,
+      category: category,
+      points: Number(item.points) || 2,
+      selected: true
+    }))
 
-      setFileBreakdownItems(formattedItems)
-      setFileDeadline(extractedDeadline)
-      setMessage(`File analyzed by Gemini! Deadline found: ${extractedDeadline || 'None specified'}`)
-    } catch (error) {
-      console.error(error)
-      setFileBreakdownItems([
-        { id: 'sub-1', name: `Review & outline ${file.name}`, category: category, points: 2, selected: true },
-        { id: 'sub-2', name: `Complete core work for ${file.name}`, category: category, points: 3, selected: true },
-        { id: 'sub-3', name: `Final review and submit`, category: category, points: 1, selected: true }
-      ])
-      setFileDeadline(selectedDate)
-      setMessage('Analyzed with fallback template. Review tasks below.')
-    } finally {
-      setIsAnalyzingFile(false)
-    }
+    setFileBreakdownItems(formattedItems)
+    setFileDeadline(extractedDeadline)
+    setMessage(`File analyzed by Gemini! Deadline found: ${extractedDeadline || 'None specified'}`)
+  } catch (error) {
+    console.error(error)
+    setFileBreakdownItems([
+      { id: 'sub-1', name: `Review & outline ${file.name}`, category: category, points: 2, selected: true },
+      { id: 'sub-2', name: `Complete core work for ${file.name}`, category: category, points: 3, selected: true },
+      { id: 'sub-3', name: `Final review and submit`, category: category, points: 1, selected: true }
+    ])
+    setFileDeadline(selectedDate)
+    setMessage('Analyzed with fallback template. Review tasks below.')
+  } finally {
+    setIsAnalyzingFile(false)
   }
+}
 
   function toggleFileItem(id) {
     setFileBreakdownItems(prev => prev.map(item => item.id === id ? { ...item, selected: !item.selected } : item))
@@ -397,26 +329,7 @@ function App() {
       setMessage('Choose a planned date on or before the deadline.')
       return
     }
-
-    // Check for time overlaps on the same day
-    const conflictingTask = tasks.find(task => {
-      if (task.date !== selectedDate) return false
-      if (editingId && task.id === editingId) return false // Skip current task if editing
-
-      const existingStart = task.startTime || '00:00'
-      const existingEnd = task.endTime || '23:59'
-
-      // Overlap condition: (StartA < EndB) && (EndA > StartB)
-      return startTime < existingEnd && endTime > existingStart
-    })
-
-    if (conflictingTask) {
-      setMessage(`Time conflict! This overlaps with "${conflictingTask.name}" (${conflictingTask.startTime} - ${conflictingTask.endTime}).`)
-      return
-    }
-
     const changes = { name, category, date: selectedDate, points: Number(effort), startTime, endTime, deadline, fixed }
-
     saveTasks(editingId
       ? tasks.map(task => task.id === editingId ? { ...task, ...changes } : task)
       : [...tasks, { id: crypto.randomUUID(), ...changes, done: false }])
@@ -430,8 +343,7 @@ function App() {
     setFixed(false)
     setMessage(`${name} ${wasEditing ? 'updated' : 'added'}.`)
 
-
-    navigate('planner')
+    navigate('dashboard')
   }
 
   const loads = categories.map(cat => {
@@ -512,7 +424,7 @@ function App() {
     setSkippedTaskIds(nextSkipped)
 
     setLoadingSuggestion(true)
-    const res = await suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, nextSkipped, categories, tasksForDay, parseDate, dateKey)
+    const res = await suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, nextSkipped)
     setAiSuggestion(res)
     setLoadingSuggestion(false)
   }
@@ -525,6 +437,7 @@ function App() {
   })
 
   const [message, setMessage] = useState('')
+
   const [aiRecommendation, setAiRecommendation] = useState(null)
   const [showFlowchartWarning, setShowFlowchartWarning] = useState(false)
 
@@ -534,22 +447,16 @@ function App() {
       const currentOverload = Math.max(0, currentLoad - dailyCapacity)
 
       if (currentOverload > 0) {
-        try {
-          const text = await getDailyInsight(selectedMood, dayTasks, dailyCapacity)
-          setAiRecommendation(text)
-          setShowFlowchartWarning(true)
-        } catch (error) {
-          console.error("Gemini insight error:", error)
-          setAiRecommendation("Your schedule looks quite packed today. Want to shuffle a few things around so you don't burn out?")
-          setShowFlowchartWarning(true)
-        }
+        const text = await getDailyInsight(selectedMood, dayTasks, dailyCapacity)
+        setAiRecommendation(text || "Your schedule looks quite packed today. Want to shuffle a few things around so you don't burn out?")
+        setShowFlowchartWarning(true)
       } else {
         setShowFlowchartWarning(false)
       }
     }
 
     fetchAiInsight()
-  }, [selectedDate, dailyCapacity, selectedMood, tasks.length]) // Fixed dependency array length mismatch
+  }, [selectedDate, dailyCapacity, selectedMood, tasks.length])
 
   function saveTasks(nextTasks) {
     setTasks(nextTasks)
@@ -557,9 +464,17 @@ function App() {
     try {
       localStorage.setItem('timo-tasks', JSON.stringify(nextTasks))
     } catch {
-      setStorageError(true)
+      // Storage fallback handled silently
     }
   }
+
+  const [selectedHealthMetric, setSelectedHealthMetric] = useState(null)
+  const [dashboardSlide, setDashboardSlide] = useState(0)
+
+  const totalTasksCount = dayTasks.length
+  const completedTasksCount = dayTasks.filter(t => t.done).length
+  const completionPercentage = totalTasksCount > 0 ? (completedTasksCount / totalTasksCount) * 100 : 0
+  const completionDonutBackground = `conic-gradient(var(--accent-dark) 0% ${completionPercentage}%, var(--border) ${completionPercentage}% 100%)`
 
   return (
     <main
@@ -638,21 +553,12 @@ function App() {
             }
             saveTasks([...tasks, newTask])
           }}
-          onTaskDeleted={(taskId) => {
-            saveTasks(tasks.filter(t => t.id !== taskId))
-          }}
-          onTaskUpdated={(updatedTask) => {
+          onTaskDeleted={(taskId) => saveTasks(tasks.filter(t => t.id !== taskId))}
+          onTaskUpdated={(updatedTask) =>
             saveTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t))
-          }}
-          onTaskReschedule={(task) => {
-            setReschedulingTask(task)
-            setRescheduleDate(task.date || selectedDate)
-            setRescheduleStartTime(task.startTime || '09:00')
-            setRescheduleEndTime(task.endTime || '10:00')
-          }}
+          }
         />
       )}
-
       {page === 'profile' && <Profile theme={theme} setTheme={setTheme} background={background} setBackground={setBackground} />}
 
       {page === 'add-task' && (
@@ -841,18 +747,15 @@ function App() {
             navigate('add-task')
           }}
           onToggle={(task) => {
-            const updatedTasks = tasks.map(t =>
-              t.id === task.id ? { ...t, done: !t.done } : t
-            )
-            saveTasks(updatedTasks)
-            setMessage(task.done ? 'Marked unfinished.' : 'Task completed.')
+            saveTasks(tasks.map(t => t.id === task.id ? { ...t, done: !t.done } : t));
+            setMessage(task.done ? 'Marked unfinished.' : 'Task completed.');
           }}
           showSuggestions={showSuggestions}
           setShowSuggestions={async (val) => {
             setShowSuggestions(val)
             if (val && !aiSuggestion) {
               setLoadingSuggestion(true)
-              const res = await suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, skippedTaskIds, categories, tasksForDay, parseDate, dateKey)
+              const res = await suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, skippedTaskIds)
               setAiSuggestion(res)
               setLoadingSuggestion(false)
             }
@@ -877,12 +780,6 @@ function App() {
             setCompanionInitialMessage("Hey Timo, I saw your insight about my workload today. Can we talk more about it?")
             navigate('companion')
           }}
-          onTaskReschedule={(task) => {
-            setReschedulingTask(task)
-            setRescheduleDate(task.date || selectedDate)
-            setRescheduleStartTime(task.startTime || '09:00')
-            setRescheduleEndTime(task.endTime || '10:00')
-          }}
         />
       )}
 
@@ -898,174 +795,120 @@ function App() {
             className="capacity-card"
             aria-labelledby="capacity-title"
           >
-            <div className="card-heading">
-              <h2 id="capacity-title">Planned load</h2>
+            <div className="dashboard-carousel" id="dashboard-carousel">
+              <section className="dashboard-slide">
+                <div className="card-heading">
+                  <h2 id="capacity-title">Today's Progress</h2>
 
-              <span
-                className="capacity-label"
-                style={{
-                  background:
-                    overload > 0 ? '#fde8e8' : 'var(--accent)',
-                  color:
-                    overload > 0 ? '#c53030' : 'var(--accent-dark)',
-                  padding: '0.4rem 0.85rem',
-                  borderRadius: '20px',
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                  border: `1px solid ${overload > 0
-                    ? '#fbc5c5'
-                    : 'var(--accent-dark)'
-                    }`,
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-                  letterSpacing: '-0.2px',
-                }}
-              >
-                {overload > 0
-                  ? '⚠️ Over capacity'
-                  : '💚 Within capacity'}
-              </span>
-            </div>
-
-            <div
-              className="mood-feedback-container"
-              style={{
-                margin: '1rem 0',
-                textAlign: 'left',
-              }}
-            >
-              <label
-                style={{
-                  display: 'block',
-                  fontWeight: 600,
-                  marginBottom: '0.5rem',
-                }}
-              >
-                How are you feeling today?
-              </label>
-
-              <div
-                className="mood-options"
-                style={{
-                  display: 'flex',
-                  gap: '0.75rem',
-                  justifyContent: 'space-between',
-                }}
-              >
-                {moods.map(m => (
-                  <button
-                    type="button"
-                    key={m.label}
-                    onClick={() => setSelectedMood(m.label)}
+                  <span
+                    className="capacity-label"
                     style={{
-                      background:
-                        selectedMood === m.label
-                          ? 'var(--accent, #d8c4ef)'
-                          : 'transparent',
-                      border:
-                        '1px solid var(--border, #ccc)',
-                      borderRadius: '12px',
-                      padding: '0.5rem',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      flex: 1,
+                      background: 'var(--accent)',
+                      color: 'var(--accent-dark)',
+                      padding: '0.4rem 0.85rem',
+                      borderRadius: '20px',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      border: '1px solid var(--accent-dark)',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                      letterSpacing: '-0.2px',
                     }}
                   >
-                    <span style={{ fontSize: '1.5rem' }}>
-                      {m.icon}
-                    </span>
-
-                    <span
-                      style={{
-                        fontSize: '0.75rem',
-                        marginTop: '0.25rem',
-                      }}
-                    >
-                      {m.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <p
-                style={{
-                  fontSize: '0.75rem',
-                  color: 'var(--muted, #666)',
-                  textAlign: 'center',
-                  marginTop: '0.5rem',
-                  marginBottom: '0.8rem'
-                }}
-              >
-                Your energy sets your daily capacity: Stressed (5 pts) to Great (12 pts).
-              </p>
-            </div>
-
-            <div
-              className="capacity-donut"
-              style={{ background: donutBackground }}
-              role="img"
-              aria-label={`${totalLoad} points planned against ${dailyCapacity} points of capacity.`}
-            >
-              <div className="donut-center" aria-hidden="true">
-                <div className="capacity-number">
-                  {totalLoad}
-                  <span> / {dailyCapacity}</span>
+                    {completedTasksCount} of {totalTasksCount} completed
+                  </span>
                 </div>
 
-                <p className="capacity-caption">
-                  points planned
-                </p>
-              </div>
-            </div>
-
-            <div className="donut-legend" aria-hidden="true">
-              {loads.map(load => (
-                <span
-                  key={load.name}
-                  style={{
-                    color: 'var(--ink)',
-                    fontWeight: 500,
-                  }}
+                <div
+                  className="capacity-donut"
+                  style={{ background: completionDonutBackground }}
+                  role="img"
+                  aria-label={`${completedTasksCount} tasks done out of ${totalTasksCount} total tasks today.`}
                 >
-                  <i
+                  <div className="donut-center" aria-hidden="true">
+                    <div className="capacity-number">
+                      {completedTasksCount}
+                      <span> / {totalTasksCount}</span>
+                    </div>
+
+                    <p className="capacity-caption">
+                      tasks done
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className="load-section"
+                  style={{
+                    marginTop: '1.5rem',
+                    borderTop: '1px solid var(--border, #e2d9ed)',
+                    paddingTop: '1rem'
+                  }}
+                  aria-labelledby="load-title"
+                >
+                  <div
+                    className="section-heading"
                     style={{
-                      background: load.color,
-                      border: '1px solid rgba(0,0,0,0.15)',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginBottom: '0.75rem'
                     }}
-                  />
-                  {load.name}
-                </span>
-              ))}
-            </div>
-
-            <div className="load-section" style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border, #e2d9ed)', paddingTop: '1rem' }} aria-labelledby="load-title">
-              <div className="section-heading" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                <h3 id="load-title" style={{ fontSize: '1rem', margin: 0 }}>Category Breakdown</h3>
-                <span style={{ fontSize: '0.85rem', color: 'var(--muted, #666)' }}>{totalLoad} pts planned</span>
-              </div>
-
-              <div className="load-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {loads.map(load => (
-                  <div className="load-row" key={load.name} style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.5)', padding: '0.5rem 0.75rem', borderRadius: '8px' }}>
-                    <span
-                      className="category-icon"
-                      style={{
-                        color: 'var(--accent-dark)',
-                        background: load.color,
-                        width: '28px',
-                        height: '28px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '6px',
-                        marginRight: '0.75rem',
-                        fontWeight: 'bold',
-                        fontSize: '0.8rem'
-                      }}
-                      aria-hidden="true"
+                  >
+                    <h3
+                      id="load-title"
+                      style={{ fontSize: '1rem', margin: 0 }}
                     >
-                      {load.icon}
+                      Category Breakdown
+                    </h3>
+
+                    <span
+                      style={{
+                        fontSize: '0.85rem',
+                        color: 'var(--muted, #666)'
+                      }}
+                    >
+                      {totalLoad} pts planned
                     </span>
+                  </div>
+
+                  <div
+                    className="load-list"
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    {loads.map(load => (
+                      <div
+                        className="load-row"
+                        key={load.name}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          background: 'rgba(255,255,255,0.5)',
+                          padding: '0.5rem 0.75rem',
+                          borderRadius: '8px'
+                        }}
+                      >
+                        <span
+                          className="category-icon"
+                          style={{
+                            color: 'var(--accent-dark)',
+                            background: load.color,
+                            width: '28px',
+                            height: '28px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '6px',
+                            marginRight: '0.75rem',
+                            fontWeight: 'bold',
+                            fontSize: '0.8rem'
+                          }}
+                          aria-hidden="true"
+                        >
+                          {load.icon}
+                        </span>
 
                         <div
                           className="load-info"
@@ -1103,6 +946,209 @@ function App() {
                 </div>
               </section>
 
+              <section className="dashboard-slide health-slide">
+                <div
+                  className="health-card"
+                  aria-labelledby="health-title"
+                >
+                  <div className="health-heading">
+                    <div>
+                      <h2 id="health-title">Health Today</h2>
+                      <p>Simulated health data for prototype</p>
+                    </div>
+
+                    <div className="health-icon">💚</div>
+                  </div>
+
+                  <div className="health-metrics">
+                    <button
+                      type="button"
+                      className={`health-metric ${selectedHealthMetric === 'steps' ? 'selected' : ''}`}
+                      onClick={() => setSelectedHealthMetric('steps')}
+                    >
+                      <div className="health-metric-icon">🚶</div>
+                      <strong>{healthData.steps.toLocaleString()}</strong>
+                      <span>Steps</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`health-metric ${selectedHealthMetric === 'sleep' ? 'selected' : ''}`}
+                      onClick={() => setSelectedHealthMetric('sleep')}
+                    >
+                      <div className="health-metric-icon">😴</div>
+                      <strong>{healthData.sleepHours} hrs</strong>
+                      <span>Sleep</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`health-metric ${selectedHealthMetric === 'exercise' ? 'selected' : ''}`}
+                      onClick={() => setSelectedHealthMetric('exercise')}
+                    >
+                      <div className="health-metric-icon">🏃</div>
+                      <strong>{healthData.exerciseMinutes} min</strong>
+                      <span>Exercise</span>
+                    </button>
+                  </div>
+
+                  {selectedHealthMetric && (
+                    <div className='health-detail'>
+                      {selectedHealthMetric === 'steps' && (
+                        <>
+                          <div className='health-detail-heading'>
+                            <span>🚶</span>
+                            <h3>Steps</h3>
+                          </div>
+
+                          <div className='health-detail-main'>
+                            <strong>{healthData.steps.toLocaleString()}</strong>
+                            <span>today</span>
+                          </div>
+
+                          <div className='health-detail-row'>
+                            <span>Daily Goal</span>
+                            <strong>8000</strong>
+                          </div>
+
+                          <div className='health-detail-row'>
+                            <span>Progress</span>
+                            <strong>{Math.round((healthData.steps / 8000 ) * 100)}%</strong>
+                          </div>
+                        </>
+                      )}
+
+                      {selectedHealthMetric === 'sleep' && (
+                        <>
+                          <div className='health-detail-heading'>
+                            <span>😴</span>
+                            <h3>Sleep</h3>
+                          </div>
+
+                          <div className='health-detail-main'>
+                            <strong>{healthData.sleepHours} hours</strong>
+                            <span>last night's sleep</span>
+                          </div>
+
+                          <div className='health-detail-row'>
+                            <span>Sleep Goal</span>
+                            <strong>8 hours</strong>
+                          </div>
+                        </>
+                      )}
+
+                      {selectedHealthMetric === 'exercise' && (
+                      <>
+                        <div className="health-detail-heading">
+                          <span>🏃</span>
+                          <h3>Exercise</h3>
+                        </div>
+
+                        <div className="health-detail-main">
+                          <strong>{healthData.exerciseMinutes} minutes</strong>
+                          <span>today</span>
+                        </div>
+
+                        <div className="health-detail-row">
+                          <span>Walking</span>
+                          <strong>25 min</strong>
+                        </div>
+
+                        <div className="health-detail-row">
+                          <span>Other activity</span>
+                          <strong>17 min</strong>
+                        </div>
+                      </>
+                    )}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    className="health-sync-button"
+                    onClick={() => alert('Health data synced successfully!')}
+                  >
+                    <span>🔄</span>
+                    Sync Health Data
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            <div className='carousel-controls'>
+
+              <button 
+                type="button"
+                className='carousel-arrow'
+                onClick={() => {
+                  const nextSlide = Math.max(0, dashboardSlide - 1)
+                  setDashboardSlide(nextSlide)
+
+                  document.getElementById('dashboard-carousel')?.scrollTo({
+                    left: nextSlide * document.getElementById('dashboard-carousel').clientWidth,
+                    behavior: 'smooth',
+                  })
+                }}
+                aria-label='Previous card'
+                disabled={dashboardSlide === 0}
+              >
+                ‹
+              </button>
+
+              <div className='carousel-dots' aria-label='Dashboard cards'>
+                <button
+                  type="button"
+                  className={`carousel-dot ${dashboardSlide === 0 ? 'active' : ''}`}
+                  onClick={() => {
+                    setDashboardSlide(0)
+                    document.getElementById('dashboard-carousel')?.scrollTo({
+                      left: 0,
+                      behavior: 'smooth',
+                    })
+                  }}
+                  aria-label="Today's Progress"
+                />
+
+                <button
+                  type="button"
+                  className={`carousel-dot ${dashboardSlide === 1 ? 'active' : ''}`}
+                  onClick={() => {
+                    const carousel = document.getElementById('dashboard-carousel')
+
+                    setDashboardSlide(1)
+
+                    carousel?.scrollTo({
+                      left: carousel.clientWidth,
+                      behavior: 'smooth',
+                    })
+                  }}
+                  aria-label="Health Today"
+                />
+              </div>
+
+              <button
+                type="button"
+                className="carousel-arrow"
+                onClick={() => {
+                  const carousel = document.getElementById('dashboard-carousel')
+                  const nextSlide = Math.min(1, dashboardSlide + 1)
+
+                  setDashboardSlide(nextSlide)
+
+                  carousel?.scrollTo({
+                    left: nextSlide * carousel.clientWidth,
+                    behavior: 'smooth',
+                  })
+                }}
+                aria-label="Next card"
+                disabled={dashboardSlide === 1}
+              >
+                ›
+              </button>
+            </div>
+
+          </section>
+
           <nav
             className="page-actions"
             aria-label="Plan your day"
@@ -1118,349 +1164,7 @@ function App() {
               + Add task
             </button>
           </nav>
-
-          <p className="selected-day" aria-live="polite">
-            {selectedDate === today ? 'Today' : date} ·{' '}
-            {dayTasks.length} tasks
-          </p>
-
-          <section
-            className="task-section"
-            aria-labelledby="tasks-title"
-          >
-            <h2 id="tasks-title">
-              Tasks for{' '}
-              {selectedDate === today ? 'today' : date}
-            </h2>
-
-            <p className="helper" role="status">
-              {message}
-            </p>
-
-            {storageError && (
-              <p role="alert">
-                Your browser could not save these tasks. They
-                may be lost when you refresh.
-              </p>
-            )}
-
-            {dayTasks.length === 0 ? (
-              <p className="helper">
-                A fresh start. Use + Add task to plan this
-                day.
-              </p>
-            ) : (
-              <ul className="task-list">
-                {dayTasks.map(task => {
-                  const points = Number(task.points);
-                  const isHeavy = points === 3;
-                  const isMedium = points === 2;
-
-                  const effortLabel = isHeavy ? 'Heavy' : isMedium ? 'Medium' : 'Light';
-                  const badgeBg = isHeavy ? '#fed7d7' : isMedium ? '#feebc8' : 'var(--accent-light, #edf2f7)';
-                  const badgeColor = isHeavy ? '#9b2c2c' : isMedium ? '#975a16' : 'inherit';
-
-                  return (
-                    <li key={task.id} style={{
-                      borderLeft: isHeavy ? '4px solid #e53e3e' : '4px solid transparent',
-                      paddingLeft: '1.25rem'
-                    }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <strong>{task.name}</strong>
-                          <span className="effort-badge" style={{ background: badgeBg, color: badgeColor }}>
-                            {effortLabel}
-                          </span>
-                        </div>
-                        <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.2rem' }}>
-                          🕒 {task.startTime} – {task.endTime} · {task.category} · {points} {points === 1 ? 'point' : 'points'}
-                        </p>
-                      </div>
-
-                      <button type="button" className="remove-task" onClick={() => startTrade(task)} aria-label={`Reschedule ${task.name}`}>Reschedule</button>
-                      <button type="button" className="remove-task" aria-label={`Remove ${task.name}`} onClick={() => { saveTasks(tasks.filter(item => item.id !== task.id)); setMessage(`${task.name} removed.`); }}>Remove</button>
-
-                      {tradingTask === task.id && (
-                        <form
-                          className="trade-form"
-                          onSubmit={event =>
-                            tradeTask(event, task)
-                          }
-                        >
-                          <label
-                            htmlFor={`trade-${task.id}`}
-                          >
-                            Move to another day
-                          </label>
-
-                          <input
-                            id={`trade-${task.id}`}
-                            type="date"
-                            required
-                            value={tradeDate}
-                            onChange={event =>
-                              setTradeDate(event.target.value)
-                            }
-                          />
-
-                          {validDate(tradeDate) && (
-                            <p className="helper">
-                              Destination load:{' '}
-                              {tasksForDay(
-                                tasks,
-                                tradeDate
-                              ).reduce(
-                                (sum, item) =>
-                                  sum + Number(item.points),
-                                0
-                              ) +
-                                (tradeDate === task.date
-                                  ? 0
-                                  : Number(task.points))}{' '}
-                              / {dailyCapacity} points after
-                              moving.
-                            </p>
-                          )}
-
-                          <div className="page-actions">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setTradingTask(null)
-                              }
-                            >
-                              Cancel
-                            </button>
-
-                            <button
-                              type="submit"
-                              disabled={
-                                !validDate(tradeDate) ||
-                                tradeDate === task.date
-                              }
-                            >
-                              Move task
-                            </button>
-                          </div>
-                        </form>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-
-          <button
-            className="primary-button"
-            aria-expanded={showSuggestions}
-            aria-controls="suggestions"
-            onClick={() =>
-              setShowSuggestions(!showSuggestions)
-            }
-          >
-            {showSuggestions
-              ? 'Hide suggestions'
-              : 'Lighten My Load'}
-
-            <span aria-hidden="true">
-              {showSuggestions ? '−' : '↗'}
-            </span>
-          </button>
-
-          <section
-            id="suggestions"
-            className="suggestions"
-            hidden={!showSuggestions}
-          >
-            <h2>A little breathing room</h2>
-
-            {suggestion ? (
-              <>
-                <p>
-                  Timo suggests moving{' '}
-                  <strong>
-                    {suggestion.task.name}
-                  </strong>{' '}
-                  ({suggestion.task.startTime}–
-                  {suggestion.task.endTime}) to{' '}
-                  <strong>
-                    {parseDate(
-                      suggestion.destination
-                    ).toLocaleDateString('en', {
-                      weekday: 'long',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </strong>
-                  .
-                </p>
-
-                <div className="move-preview">
-                  <p>
-                    This day:{' '}
-                    <strong>
-                      {suggestion.sourceBefore} →{' '}
-                      {suggestion.sourceAfter} pts
-                    </strong>
-                  </p>
-
-                  <p>
-                    New day:{' '}
-                    <strong>
-                      {suggestion.destinationBefore} →{' '}
-                      {suggestion.destinationAfter} pts
-                    </strong>
-                  </p>
-                </div>
-
-                <p>
-                  {suggestion.remaining === 0
-                    ? 'This brings both days within your estimated capacity.'
-                    : `This frees up ${suggestion.task.points} points, leaving ${suggestion.remaining} points above your estimate on this day.`}
-                </p>
-
-                <div className="page-actions">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setShowSuggestions(false)
-                    }
-                  >
-                    Keep my plan
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={acceptSuggestion}
-                  >
-                    Yes, move task
-                  </button>
-                </div>
-              </>
-            ) : (
-              <p>
-                {selectedDate < today
-                  ? 'This is a past day. Choose today or a future date to adjust your plan.'
-                  : overload === 0
-                    ? 'Your plan is within your estimated capacity. Keep some room for breaks.'
-                    : 'Timo could not find a task that can be moved within the next 7 days.'}
-              </p>
-            )}
-          </section>
         </>
-      )}
-
-      {reschedulingTask && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          backgroundColor: 'rgba(0, 0, 0, 0.4)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '1rem'
-        }}>
-          <div style={{
-            background: 'var(--card-bg, #fff)',
-            padding: '1.5rem',
-            borderRadius: '16px',
-            width: '100%',
-            maxWidth: '400px',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-            border: '1px solid var(--border)'
-          }}>
-            <h2 style={{ fontSize: '1.2rem', marginBottom: '0.4rem' }}>Reschedule Task</h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '1rem' }}>
-              Choose a new date and time for <strong>{reschedulingTask.name}</strong>.
-            </p>
-
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.75rem' }}>
-              New Date
-              <input
-                type="date"
-                value={rescheduleDate}
-                onChange={e => setRescheduleDate(e.target.value)}
-                style={{ display: 'block', width: '100%', marginTop: '0.3rem', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}
-              />
-            </label>
-
-            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem' }}>
-              <label style={{ flex: 1, fontSize: '0.85rem', fontWeight: 600 }}>
-                Start Time
-                <input
-                  type="time"
-                  value={rescheduleStartTime}
-                  onChange={e => setRescheduleStartTime(e.target.value)}
-                  style={{ display: 'block', width: '100%', marginTop: '0.3rem', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}
-                />
-              </label>
-
-              <label style={{ flex: 1, fontSize: '0.85rem', fontWeight: 600 }}>
-                End Time
-                <input
-                  type="time"
-                  value={rescheduleEndTime}
-                  onChange={e => setRescheduleEndTime(e.target.value)}
-                  style={{ display: 'block', width: '100%', marginTop: '0.3rem', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}
-                />
-              </label>
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                type="button"
-                onClick={() => setReschedulingTask(null)}
-                style={{ flex: 1, background: 'var(--border)', color: 'var(--text)', padding: '0.6rem', borderRadius: '8px', border: 'none', fontWeight: 600, cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="primary-button"
-                onClick={() => {
-                  if (rescheduleStartTime >= rescheduleEndTime) {
-                    setMessage('End time must be after start time.')
-                    return
-                  }
-
-                  // Check for time overlaps on the target reschedule date
-                  const conflictingTask = tasks.find(task => {
-                    if (task.date !== rescheduleDate) return false
-                    if (task.id === reschedulingTask.id) return false // Skip the task being rescheduled
-
-                    const existingStart = task.startTime || '00:00'
-                    const existingEnd = task.endTime || '23:59'
-
-                    // Overlap condition: (StartA < EndB) && (EndA > StartB)
-                    return rescheduleStartTime < existingEnd && rescheduleEndTime > existingStart
-                  })
-
-                  if (conflictingTask) {
-                    setMessage(`Time conflict! This overlaps with "${conflictingTask.name}" (${conflictingTask.startTime} - ${conflictingTask.endTime}).`)
-                    return
-                  }
-
-                  saveTasks(tasks.map(t => t.id === reschedulingTask.id ? {
-                    ...t,
-                    date: rescheduleDate,
-                    startTime: rescheduleStartTime,
-                    endTime: rescheduleEndTime
-                  } : t))
-                  setMessage(`Rescheduled "${reschedulingTask.name}" successfully!`)
-                  setReschedulingTask(null)
-                }}
-                style={{ flex: 1, padding: '0.6rem', borderRadius: '8px', border: 'none', fontWeight: 600, cursor: 'pointer' }}
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       <BottomNav page={page} navigate={navigate} />
