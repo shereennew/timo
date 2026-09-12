@@ -36,6 +36,69 @@ const themes = {
   green: { label: 'Green', color: '#c5e4cd' },
 }
 
+<<<<<<< HEAD
+=======
+/* =========================
+   FLOWCHART AI LOGIC EVALUATOR
+   ========================= */
+
+function evaluateUserStatus(userState) {
+  const { energyLevel, upcomingTasks } = userState
+
+  if (energyLevel === 'Stressed') {
+    return {
+      recommendation: "You're feeling stressed today. Let's take things slow—how about scheduling a longer break?",
+      action: 'check_schedule',
+      tasks: upcomingTasks,
+    }
+  }
+
+  if (energyLevel === 'Anxious') {
+    return {
+      recommendation: "Anxiety can feel really overwhelming. Would you like to lighten your load or take a mindful pause?",
+      action: 'check_schedule',
+      tasks: upcomingTasks,
+    }
+  }
+
+  if (energyLevel === 'Okay') {
+    return {
+      recommendation: "You're cruising at an okay pace. A short break or some light activity might feel nice soon!",
+      action: 'check_schedule',
+      tasks: upcomingTasks,
+    }
+  }
+
+  if (energyLevel === 'Good' || energyLevel === 'Great') {
+    return {
+      recommendation: "You're radiating good energy today! Keep up the great balance.",
+      action: 'continue',
+      tasks: upcomingTasks,
+    }
+  }
+
+  return {
+    recommendation: "Keeping an eye on your energy—you're doing great!",
+    action: 'continue',
+    tasks: upcomingTasks,
+  }
+}
+
+function processScheduleCheck(tasks) {
+  const hasTooManyTasks = tasks && tasks.length > 3
+
+  if (hasTooManyTasks) {
+    return {
+      suggestion: "Your schedule looks quite packed today. Want to shuffle a few things around so you don't burn out?",
+      nextStep: "Monitor user's status & energy",
+    }
+  }
+
+  return {
+    suggestion: "Your schedule is looking balanced and manageable.",
+    nextStep: "Monitor user's status & energy",
+  }
+}
 
 function App() {
   const [page, setPage] = useState('planner')
@@ -496,14 +559,9 @@ function App() {
     try {
       localStorage.setItem('timo-tasks', JSON.stringify(nextTasks))
     } catch {
-      // Storage fallback handled silently
+      setStorageError(true)
     }
   }
-
-  const totalTasksCount = dayTasks.length
-  const completedTasksCount = dayTasks.filter(t => t.done).length
-  const completionPercentage = totalTasksCount > 0 ? (completedTasksCount / totalTasksCount) * 100 : 0
-  const completionDonutBackground = `conic-gradient(var(--accent-dark) 0% ${completionPercentage}%, var(--border) ${completionPercentage}% 100%)`
 
   return (
     <main
@@ -843,42 +901,143 @@ function App() {
             aria-labelledby="capacity-title"
           >
             <div className="card-heading">
-              <h2 id="capacity-title">Today's Progress</h2>
+              <h2 id="capacity-title">Planned load</h2>
 
               <span
                 className="capacity-label"
                 style={{
-                  background: 'var(--accent)',
-                  color: 'var(--accent-dark)',
+                  background:
+                    overload > 0 ? '#fde8e8' : 'var(--accent)',
+                  color:
+                    overload > 0 ? '#c53030' : 'var(--accent-dark)',
                   padding: '0.4rem 0.85rem',
                   borderRadius: '20px',
                   fontWeight: 700,
                   fontSize: '0.85rem',
-                  border: '1px solid var(--accent-dark)',
+                  border: `1px solid ${overload > 0
+                    ? '#fbc5c5'
+                    : 'var(--accent-dark)'
+                    }`,
                   boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
                   letterSpacing: '-0.2px',
                 }}
               >
-                {completedTasksCount} of {totalTasksCount} completed
+                {overload > 0
+                  ? '⚠️ Over capacity'
+                  : '💚 Within capacity'}
               </span>
             </div>
 
             <div
+              className="mood-feedback-container"
+              style={{
+                margin: '1rem 0',
+                textAlign: 'left',
+              }}
+            >
+              <label
+                style={{
+                  display: 'block',
+                  fontWeight: 600,
+                  marginBottom: '0.5rem',
+                }}
+              >
+                How are you feeling today?
+              </label>
+
+              <div
+                className="mood-options"
+                style={{
+                  display: 'flex',
+                  gap: '0.75rem',
+                  justifyContent: 'space-between',
+                }}
+              >
+                {moods.map(m => (
+                  <button
+                    type="button"
+                    key={m.label}
+                    onClick={() => setSelectedMood(m.label)}
+                    style={{
+                      background:
+                        selectedMood === m.label
+                          ? 'var(--accent, #d8c4ef)'
+                          : 'transparent',
+                      border:
+                        '1px solid var(--border, #ccc)',
+                      borderRadius: '12px',
+                      padding: '0.5rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      flex: 1,
+                    }}
+                  >
+                    <span style={{ fontSize: '1.5rem' }}>
+                      {m.icon}
+                    </span>
+
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        marginTop: '0.25rem',
+                      }}
+                    >
+                      {m.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <p
+                style={{
+                  fontSize: '0.75rem',
+                  color: 'var(--muted, #666)',
+                  textAlign: 'center',
+                  marginTop: '0.5rem',
+                  marginBottom: '0.8rem'
+                }}
+              >
+                Your energy sets your daily capacity: Stressed (5 pts) to Great (12 pts).
+              </p>
+            </div>
+
+            <div
               className="capacity-donut"
-              style={{ background: completionDonutBackground }}
+              style={{ background: donutBackground }}
               role="img"
-              aria-label={`${completedTasksCount} tasks done out of ${totalTasksCount} total tasks today.`}
+              aria-label={`${totalLoad} points planned against ${dailyCapacity} points of capacity.`}
             >
               <div className="donut-center" aria-hidden="true">
                 <div className="capacity-number">
-                  {completedTasksCount}
-                  <span> / {totalTasksCount}</span>
+                  {totalLoad}
+                  <span> / {dailyCapacity}</span>
                 </div>
 
                 <p className="capacity-caption">
-                  tasks done
+                  points planned
                 </p>
               </div>
+            </div>
+
+            <div className="donut-legend" aria-hidden="true">
+              {loads.map(load => (
+                <span
+                  key={load.name}
+                  style={{
+                    color: 'var(--ink)',
+                    fontWeight: 500,
+                  }}
+                >
+                  <i
+                    style={{
+                      background: load.color,
+                      border: '1px solid rgba(0,0,0,0.15)',
+                    }}
+                  />
+                  {load.name}
+                </span>
+              ))}
             </div>
 
             <div className="load-section" style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border, #e2d9ed)', paddingTop: '1rem' }} aria-labelledby="load-title">
@@ -910,20 +1069,41 @@ function App() {
                       {load.icon}
                     </span>
 
-                    <div className="load-info" style={{ flex: 1 }}>
-                      <h4 style={{ margin: 0, fontSize: '0.9rem' }}>{load.name}</h4>
-                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#666' }}>{load.detail}</p>
-                    </div>
+                        <div
+                          className="load-info"
+                          style={{ flex: 1 }}
+                        >
+                          <h4 style={{ margin: 0, fontSize: '0.9rem' }}>
+                            {load.name}
+                          </h4>
 
-                    <strong style={{ fontSize: '0.9rem' }}>
-                      {load.points}
-                      <span style={{ fontSize: '0.75rem', fontWeight: 'normal' }}> pts</span>
-                    </strong>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: '0.75rem',
+                              color: '#666'
+                            }}
+                          >
+                            {load.detail}
+                          </p>
+                        </div>
+
+                        <strong style={{ fontSize: '0.9rem' }}>
+                          {load.points}
+                          <span
+                            style={{
+                              fontSize: '0.75rem',
+                              fontWeight: 'normal'
+                            }}
+                          >
+                            {' '}pts
+                          </span>
+                        </strong>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          </section>
+                </div>
+              </section>
 
           <nav
             className="page-actions"
@@ -940,6 +1120,236 @@ function App() {
               + Add task
             </button>
           </nav>
+
+          <p className="selected-day" aria-live="polite">
+            {selectedDate === today ? 'Today' : date} ·{' '}
+            {dayTasks.length} tasks
+          </p>
+
+          <section
+            className="task-section"
+            aria-labelledby="tasks-title"
+          >
+            <h2 id="tasks-title">
+              Tasks for{' '}
+              {selectedDate === today ? 'today' : date}
+            </h2>
+
+            <p className="helper" role="status">
+              {message}
+            </p>
+
+            {storageError && (
+              <p role="alert">
+                Your browser could not save these tasks. They
+                may be lost when you refresh.
+              </p>
+            )}
+
+            {dayTasks.length === 0 ? (
+              <p className="helper">
+                A fresh start. Use + Add task to plan this
+                day.
+              </p>
+            ) : (
+              <ul className="task-list">
+                {dayTasks.map(task => {
+                  const points = Number(task.points);
+                  const isHeavy = points === 3;
+                  const isMedium = points === 2;
+
+                  const effortLabel = isHeavy ? 'Heavy' : isMedium ? 'Medium' : 'Light';
+                  const badgeBg = isHeavy ? '#fed7d7' : isMedium ? '#feebc8' : 'var(--accent-light, #edf2f7)';
+                  const badgeColor = isHeavy ? '#9b2c2c' : isMedium ? '#975a16' : 'inherit';
+
+                  return (
+                    <li key={task.id} style={{
+                      borderLeft: isHeavy ? '4px solid #e53e3e' : '4px solid transparent',
+                      paddingLeft: '1.25rem'
+                    }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <strong>{task.name}</strong>
+                          <span className="effort-badge" style={{ background: badgeBg, color: badgeColor }}>
+                            {effortLabel}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.2rem' }}>
+                          🕒 {task.startTime} – {task.endTime} · {task.category} · {points} {points === 1 ? 'point' : 'points'}
+                        </p>
+                      </div>
+
+                      <button type="button" className="remove-task" onClick={() => startTrade(task)} aria-label={`Reschedule ${task.name}`}>Reschedule</button>
+                      <button type="button" className="remove-task" aria-label={`Remove ${task.name}`} onClick={() => { saveTasks(tasks.filter(item => item.id !== task.id)); setMessage(`${task.name} removed.`); }}>Remove</button>
+
+                      {tradingTask === task.id && (
+                        <form
+                          className="trade-form"
+                          onSubmit={event =>
+                            tradeTask(event, task)
+                          }
+                        >
+                          <label
+                            htmlFor={`trade-${task.id}`}
+                          >
+                            Move to another day
+                          </label>
+
+                          <input
+                            id={`trade-${task.id}`}
+                            type="date"
+                            required
+                            value={tradeDate}
+                            onChange={event =>
+                              setTradeDate(event.target.value)
+                            }
+                          />
+
+                          {validDate(tradeDate) && (
+                            <p className="helper">
+                              Destination load:{' '}
+                              {tasksForDay(
+                                tasks,
+                                tradeDate
+                              ).reduce(
+                                (sum, item) =>
+                                  sum + Number(item.points),
+                                0
+                              ) +
+                                (tradeDate === task.date
+                                  ? 0
+                                  : Number(task.points))}{' '}
+                              / {dailyCapacity} points after
+                              moving.
+                            </p>
+                          )}
+
+                          <div className="page-actions">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setTradingTask(null)
+                              }
+                            >
+                              Cancel
+                            </button>
+
+                            <button
+                              type="submit"
+                              disabled={
+                                !validDate(tradeDate) ||
+                                tradeDate === task.date
+                              }
+                            >
+                              Move task
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          <button
+            className="primary-button"
+            aria-expanded={showSuggestions}
+            aria-controls="suggestions"
+            onClick={() =>
+              setShowSuggestions(!showSuggestions)
+            }
+          >
+            {showSuggestions
+              ? 'Hide suggestions'
+              : 'Lighten My Load'}
+
+            <span aria-hidden="true">
+              {showSuggestions ? '−' : '↗'}
+            </span>
+          </button>
+
+          <section
+            id="suggestions"
+            className="suggestions"
+            hidden={!showSuggestions}
+          >
+            <h2>A little breathing room</h2>
+
+            {suggestion ? (
+              <>
+                <p>
+                  Timo suggests moving{' '}
+                  <strong>
+                    {suggestion.task.name}
+                  </strong>{' '}
+                  ({suggestion.task.startTime}–
+                  {suggestion.task.endTime}) to{' '}
+                  <strong>
+                    {parseDate(
+                      suggestion.destination
+                    ).toLocaleDateString('en', {
+                      weekday: 'long',
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </strong>
+                  .
+                </p>
+
+                <div className="move-preview">
+                  <p>
+                    This day:{' '}
+                    <strong>
+                      {suggestion.sourceBefore} →{' '}
+                      {suggestion.sourceAfter} pts
+                    </strong>
+                  </p>
+
+                  <p>
+                    New day:{' '}
+                    <strong>
+                      {suggestion.destinationBefore} →{' '}
+                      {suggestion.destinationAfter} pts
+                    </strong>
+                  </p>
+                </div>
+
+                <p>
+                  {suggestion.remaining === 0
+                    ? 'This brings both days within your estimated capacity.'
+                    : `This frees up ${suggestion.task.points} points, leaving ${suggestion.remaining} points above your estimate on this day.`}
+                </p>
+
+                <div className="page-actions">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowSuggestions(false)
+                    }
+                  >
+                    Keep my plan
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={acceptSuggestion}
+                  >
+                    Yes, move task
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p>
+                {selectedDate < today
+                  ? 'This is a past day. Choose today or a future date to adjust your plan.'
+                  : overload === 0
+                    ? 'Your plan is within your estimated capacity. Keep some room for breaks.'
+                    : 'Timo could not find a task that can be moved within the next 7 days.'}
+              </p>
+            )}
+          </section>
         </>
       )}
 
