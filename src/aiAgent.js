@@ -30,7 +30,7 @@ export async function analyzeFileWithAI(filePart, category, selectedDate) {
 /**
  * 2. Suggests an intelligent workload adjustment when the user is overloaded.
  */
-export async function suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, skippedTaskIds = [], categories, tasksForDay, parseDate, dateKey) {
+export async function suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, skippedTaskIds = []) {
     if (selectedDate < today) return null;
 
     const currentTasks = tasksForDay(tasks, selectedDate);
@@ -58,11 +58,13 @@ export async function suggestAIAdjustment(tasks, selectedDate, dailyCapacity, to
     Total load: ${totalLoad} points. Daily capacity limit: ${dailyCapacity} points.
     Upcoming available days load profile over next 7 days: ${JSON.stringify(upcomingContext)}
 
-    Choose ONE flexible task from the available tasks list to move to one of the upcoming days where it won't cause an overload.
+    Choose ONE flexible task from the available tasks list to move to one of the upcoming days where it won't cause an overload. You MUST also suggest a short relaxation activity.
     Return ONLY a valid JSON object with:
     - "taskId": string (the id of the task to move)
     - "destinationDate": string (YYYY-MM-DD format of the target day)
-    - "reason": string (a short friendly sentence explaining why this helps)`;
+    - "reason": string (a short friendly sentence explaining why this helps)
+    - "relaxTitle": string (REQUIRED: short title for a relaxation break, e.g., "15-min deep breathing & stretching")
+    - "relaxDurationMinutes": number (REQUIRED: duration in minutes, e.g., 15)`;
 
         const response = await ai.models.generateContent({
             model: MODEL_NAME,
@@ -92,7 +94,9 @@ export async function suggestAIAdjustment(tasks, selectedDate, dailyCapacity, to
             destinationBefore,
             destinationAfter,
             remaining: Math.max(0, sourceAfter - dailyCapacity),
-            aiReason: result.reason
+            aiReason: result.reason,
+            relaxTitle: result.relaxTitle || 'Relaxation Break',
+            relaxDurationMinutes: result.relaxDurationMinutes || 15
         };
     } catch (error) {
         console.error("Gemini suggestion error:", error);
@@ -129,16 +133,18 @@ export async function getDailyInsight(selectedMood, dayTasks, dailyCapacity) {
 /**
  * 4. Handles chat agent messaging with Tool Use (Function Calling) enabled.
  */
-export async function sendAgentMessage(messages, filePart = null) {
+export async function sendAgentMessage(messages, filePart = null, fileName = null) {
     try {
         const systemInstruction = `
 You are Timo, a warm and concise productivity companion. 
 Rules for your answers:
 1. Be direct and concise. 
 2. When the user asks for specific information (like free time, a single task, or a deadline), provide ONLY that information. Do not dump the entire schedule or unrequested details unless explicitly asked.
-3. Keep your tone encouraging, helpful, and natural.
-4. Use bullet points whenever you are listing items, free time slots, or multiple details to keep your responses clean and easy to read.
+3. When a file is attached, acknowledge its filename (e.g., "${fileName}") and provide a clear, bulleted breakdown of the tasks or key points found inside.
+4. Keep your tone encouraging, helpful, and natural.
 5. Be direct and provide only the specific information requested.
+6. When answering or breaking down information, you MUST use clean Markdown bullet points (- or *). 
+7. CRITICAL: Every single bullet point must start on a brand new line. Never put inline asterisks or collapse bullet points into a single paragraph block.
 `;
 
         const contents = [systemInstruction];
@@ -148,6 +154,9 @@ Rules for your answers:
         }
 
         if (filePart) {
+            if (fileName) {
+                contents.push(`User attached file: ${fileName}`);
+            }
             contents.push(filePart);
         }
 

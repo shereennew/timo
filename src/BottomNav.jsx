@@ -2,8 +2,8 @@ export default function BottomNav({ page, navigate }) {
   const navItems = [
     { id: 'planner', label: 'Planner', icon: '🕒' },
     { id: 'dashboard', label: 'Summary', icon: '☀️' },
-    { id: 'calendar', label: 'Calendar', icon: '📅' },
     { id: 'companion', label: 'Companion', icon: '🤖' },
+    { id: 'calendar', label: 'Calendar', icon: '📅' },
     { id: 'profile', label: 'Profile', icon: '👤' },
   ]
 

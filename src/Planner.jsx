@@ -12,6 +12,7 @@ export default function Planner({
   onRemove,
   onToggle,
   onAdd,
+  onAddRelaxBreak,
   showSuggestions,
   setShowSuggestions,
   suggestion,
@@ -35,7 +36,6 @@ export default function Planner({
   const [view, setView] = useState('daily')
   const currentDayTasks = tasksForDay(tasks, date)
   const { rows, unscheduled } = timelineFor(currentDayTasks)
-
 
   function step(offset) {
     const d = parseDate(date)
@@ -221,7 +221,7 @@ export default function Planner({
             </button>
           </div>
         )}
-        
+
       </div>
 
       <section className="planner-date-controls" aria-label="Change planner date">
@@ -248,36 +248,36 @@ export default function Planner({
       </div>
 
       {view === 'week' ? (
-        <WeeklyTimetable 
-          date={date} 
-          today={today} 
-          tasks={tasks} 
-          onDate={onDate} 
-          onEdit={onEdit} 
-          view={view} 
-          onViewChange={setView} 
+        <WeeklyTimetable
+          date={date}
+          today={today}
+          tasks={tasks}
+          onDate={onDate}
+          onEdit={onEdit}
+          view={view}
+          onViewChange={setView}
         />
       ) : <>
-      <div className="planner-timeline">
-        {rows.length ? rows.map(row => row.kind === 'gap' ? (
-          <div className="planner-gap" key={`gap-${row.start}`}>
-            <strong>{row.start}–{row.end}</strong>
-            <span>Free time</span>
-          </div>
-        ) : card(row.task)) : (
-          <p>No timed plans yet.</p>
-        )}
-      </div>
+        <div className="planner-timeline">
+          {rows.length ? rows.map(row => row.kind === 'gap' ? (
+            <div className="planner-gap" key={`gap-${row.start}`}>
+              <strong>{row.start}–{row.end}</strong>
+              <span>Free time</span>
+            </div>
+          ) : card(row.task)) : (
+            <p>No timed plans yet.</p>
+          )}
+        </div>
 
-      {
-        unscheduled.length > 0 && (
-          <section>
-            <h2>Unscheduled</h2>
-            <p className="helper">These tasks have no complete time slot yet.</p>
-            {unscheduled.map(card)}
-          </section>
-        )
-      }
+        {
+          unscheduled.length > 0 && (
+            <section>
+              <h2>Unscheduled</h2>
+              <p className="helper">These tasks have no complete time slot yet.</p>
+              {unscheduled.map(card)}
+            </section>
+          )
+        }
 
       </>}
 
@@ -298,40 +298,81 @@ export default function Planner({
           <p>✨ Timo is thinking of the best way to lighten your load...</p>
         ) : suggestion ? (
           <>
-            <p>
-              Timo suggests moving{' '}
-              <strong>{suggestion.task.name}</strong> ({suggestion.task.startTime}–{suggestion.task.endTime}) to{' '}
-              <strong>
-                {parseDate(suggestion.destination).toLocaleDateString('en', {
-                  weekday: 'long',
-                  month: 'short',
-                  day: 'numeric',
-                })}
-              </strong>.
-            </p>
-
-            {suggestion.aiReason && (
-              <p style={{ fontSize: '0.85rem', fontStyle: 'italic', color: 'var(--muted)' }}>
-                "{suggestion.aiReason}"
+            {/* Task Moving Section */}
+            <div style={{ background: 'rgba(255, 255, 255, 0.7)', padding: '0.8rem', borderRadius: '10px', marginBottom: '0.5rem', border: '1px solid var(--border)' }}>
+              <p style={{ marginBottom: '0.4rem' }}>
+                🗓️ <strong>Reschedule Task:</strong> Move <strong>{suggestion.task.name}</strong> to{' '}
+                <strong>
+                  {parseDate(suggestion.destination).toLocaleDateString('en', {
+                    weekday: 'long',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </strong>.
               </p>
-            )}
-
-            <div className="move-preview">
-              <p>
-                This day: <strong>{suggestion.sourceBefore} → {suggestion.sourceAfter} pts</strong>
-              </p>
-              <p>
-                New day: <strong>{suggestion.destinationBefore} → {suggestion.destinationAfter} pts</strong>
-              </p>
+              {suggestion.aiReason && (
+                <p style={{ fontSize: '0.85rem', fontStyle: 'italic', color: 'var(--muted)', marginBottom: '0.5rem' }}>
+                  "{suggestion.aiReason}"
+                </p>
+              )}
+              <div className="move-preview" style={{ marginBottom: '0.6rem' }}>
+                <p>This day: <strong>{suggestion.sourceBefore} → {suggestion.sourceAfter} pts</strong></p>
+                <p>New day: <strong>{suggestion.destinationBefore} → {suggestion.destinationAfter} pts</strong></p>
+              </div>
+              <button
+                type="button"
+                onClick={() => acceptSuggestion(suggestion)}
+                style={{
+                  background: 'var(--accent)',
+                  color: 'var(--accent-dark)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.5rem 0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  width: '100%',
+                  fontSize: '0.85rem'
+                }}
+              >
+                Yes, move task ↗
+              </button>
             </div>
 
-            <p>
-              {suggestion.remaining === 0
-                ? 'This brings both days within your estimated capacity.'
-                : `This frees up ${suggestion.task.points} points, leaving ${suggestion.remaining} points above your estimate on this day.`}
-            </p>
+            {/* Big OR Divider */}
+            <div style={{ textAlign: 'center', margin: '0.6rem 0', fontWeight: 700, fontSize: '0.95rem', color: 'var(--accent-dark)', letterSpacing: '1px' }}>
+              — OR —
+            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '1.2rem' }}>
+            {/* Separate Relax Activity Section */}
+            {suggestion.relaxTitle && (
+              <div style={{ background: 'rgba(216, 196, 239, 0.25)', padding: '0.8rem', borderRadius: '10px', marginBottom: '0.75rem', border: '1px solid var(--border)' }}>
+                <p style={{ marginBottom: '0.4rem', fontWeight: 600, color: 'var(--accent-dark)' }}>
+                  🌿 Recharge Break Suggestion
+                </p>
+                <p style={{ fontSize: '0.9rem', marginBottom: '0.6rem' }}>
+                  {suggestion.relaxTitle} ({suggestion.relaxDurationMinutes} mins)
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onAddRelaxBreak(suggestion)}
+                  style={{
+                    background: 'var(--accent-dark)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '0.5rem 0.75rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    width: '100%',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  Add to schedule ↗
+                </button>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem' }}>
               <button
                 type="button"
                 onClick={onSkipSuggestion}
@@ -342,47 +383,27 @@ export default function Planner({
                   fontSize: '0.85rem',
                   textDecoration: 'underline',
                   cursor: 'pointer',
-                  alignSelf: 'flex-start',
                   padding: '0'
                 }}
               >
                 Skip task instead
               </button>
-
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowSuggestions(false)}
-                  style={{
-                    flex: 1,
-                    background: 'var(--accent-dark)',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '0.75rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Keep my plan
-                </button>
-                <button
-                  type="button"
-                  onClick={() => acceptSuggestion(suggestion)}
-                  style={{
-                    flex: 1,
-                    background: 'var(--accent)',
-                    color: 'var(--accent-dark)',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '0.75rem',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  Yes, move task ↗
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowSuggestions(false)}
+                style={{
+                  background: 'var(--accent-dark)',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '0.5rem 1rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontSize: '0.85rem'
+                }}
+              >
+                Close
+              </button>
             </div>
           </>
         ) : (

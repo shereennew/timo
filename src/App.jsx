@@ -6,7 +6,7 @@ import AICompanion from './AICompanion'
 import Profile from './Profile'
 import Planner from './Planner'
 import { dateKey, parseDate, validDate, tasksForDay } from './planning'
-import { analyzeFileWithAI, suggestAIAdjustment, getDailyInsight } from './aiAgent'
+import { analyzeFileWithAI, suggestAIAdjustment, getDailyInsight } from './aiAgent';
 
 const categories = [
   { name: 'Academic', detail: 'Classes & assignment', points: 5, color: 'var(--chart-1)', icon: 'A' },
@@ -74,6 +74,12 @@ function App() {
   const [companionMessages, setCompanionMessages] = useState([
     { role: 'assistant', content: "Hey there! 🌿 I'm Timo. What are we working on today? Feel free to drop a question, paste some text, or just tell me what's on your mind!" }
   ])
+
+
+  const [reschedulingTask, setReschedulingTask] = useState(null)
+  const [rescheduleDate, setRescheduleDate] = useState(selectedDate)
+  const [rescheduleStartTime, setRescheduleStartTime] = useState('09:00')
+  const [rescheduleEndTime, setRescheduleEndTime] = useState('10:00')
 
   const dailyCapacity =
     moods.find(m => m.label === selectedMood)?.points || 8
@@ -418,6 +424,91 @@ function App() {
     setShowSuggestions(false)
   }
 
+  function handleAddRelaxBreak(suggestion) {
+    if (!suggestion) return;
+
+    const now = new Date();
+    const currentH = String(now.getHours()).padStart(2, '0');
+    const currentM = String(now.getMinutes()).padStart(2, '0');
+    const startTime = `${currentH}:${currentM}`;
+
+    const [startH, startM] = startTime.split(':').map(Number);
+    const durationMins = suggestion.relaxDurationMinutes || 15;
+    
+    const totalStartMins = startH * 60 + startM;
+    const totalEndMins = totalStartMins + durationMins;
+    const endH = String(Math.floor(totalEndMins / 60) % 24).padStart(2, '0');
+    const endM = String(totalEndMins % 60).padStart(2, '0');
+    const endTime = `${endH}:${endM}`;
+
+    const newRelaxTask = {
+      id: crypto.randomUUID(),
+      name: `🌿 ${suggestion.relaxTitle}`,
+      category: 'Social',
+      points: 1,
+      date: selectedDate,
+      startTime: startTime,
+      endTime: endTime,
+      done: false,
+      fixed: false
+    };
+
+    const formatTime = (mins) => {
+      const h = String(Math.floor(mins / 60) % 24).padStart(2, '0');
+      const m = String(mins % 60).padStart(2, '0');
+      return `${h}:${m}`;
+    };
+
+    const updatedTasks = [];
+
+    tasks.forEach(t => {
+      if (t.date === selectedDate && t.startTime && t.endTime) {
+        const [tStartH, tStartM] = t.startTime.split(':').map(Number);
+        const [tEndH, tEndM] = t.endTime.split(':').map(Number);
+        const tStartMins = tStartH * 60 + tStartM;
+        const tEndMins = tEndH * 60 + tEndM;
+
+        // Check if the break splits right through this task (e.g. 14:00-17:00 and break starts at 14:13)
+        if (tStartMins < totalStartMins && tEndMins > totalStartMins) {
+          // Part 1: Before the break
+          updatedTasks.push({
+            ...t,
+            endTime: startTime,
+            points: Math.max(1, Math.round(t.points / 2))
+          });
+
+          // Part 2: After the break (pushed back by durationMins)
+          const newPart2Start = totalEndMins;
+          const newPart2End = tEndMins + durationMins;
+          updatedTasks.push({
+            ...t,
+            id: crypto.randomUUID(),
+            name: `${t.name} (Part 2)`,
+            startTime: formatTime(newPart2Start),
+            endTime: formatTime(newPart2End),
+            points: Math.max(1, Math.floor(t.points / 2))
+          });
+        } else if (tStartMins >= totalStartMins) {
+          // Task starts at or after break: shift forward completely
+          updatedTasks.push({
+            ...t,
+            startTime: formatTime(tStartMins + durationMins),
+            endTime: formatTime(tEndMins + durationMins)
+          });
+        } else {
+          // Task is completely before the break: leave untouched
+          updatedTasks.push(t);
+        }
+      } else {
+        updatedTasks.push(t);
+      }
+    });
+
+    saveTasks([...updatedTasks, newRelaxTask]);
+    setShowSuggestions(false);
+    setMessage(`Added break and split overlapping tasks cleanly.`);
+  }
+
   async function handleSkipSuggestion() {
     if (!aiSuggestion) return
     const nextSkipped = [...skippedTaskIds, aiSuggestion.task.id]
@@ -746,6 +837,7 @@ function App() {
             setStartTime('09:00'); setEndTime('10:00'); setDeadline(''); setFixed(false)
             navigate('add-task')
           }}
+          onAddRelaxBreak={handleAddRelaxBreak}
           onToggle={(task) => {
             saveTasks(tasks.map(t => t.id === task.id ? { ...t, done: !t.done } : t));
             setMessage(task.done ? 'Marked unfinished.' : 'Task completed.');
@@ -946,138 +1038,93 @@ function App() {
                 </div>
               </section>
 
-              <section className="dashboard-slide health-slide">
-                <div
-                  className="health-card"
-                  aria-labelledby="health-title"
-                >
-                  <div className="health-heading">
-                    <div>
-                      <h2 id="health-title">Health Today</h2>
-                      <p>Simulated health data for prototype</p>
-                    </div>
+          <nav
+            className="page-actions"
+            aria-label="Plan your day"
+            style={{ margin: '1.5rem 0' }}
+          >
+            <button
+              onClick={() => {
+                setMessage('')
+                navigate('add-task')
+              }}
+              style={{ width: '100%' }}
+            >
+              + Add task
+            </button>
+          </nav>
+        </>
+      )}
 
-                    <div className="health-icon">💚</div>
-                  </div>
+      {reschedulingTask && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: 'var(--card-bg, #fff)',
+            padding: '1.5rem',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '400px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            border: '1px solid var(--border)'
+          }}>
+            <h2 style={{ fontSize: '1.2rem', marginBottom: '0.4rem' }}>Reschedule Task</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '1rem' }}>
+              Choose a new date and time for <strong>{reschedulingTask.name}</strong>.
+            </p>
 
-                  <div className="health-metrics">
-                    <button
-                      type="button"
-                      className={`health-metric ${selectedHealthMetric === 'steps' ? 'selected' : ''}`}
-                      onClick={() => setSelectedHealthMetric('steps')}
-                    >
-                      <div className="health-metric-icon">🚶</div>
-                      <strong>{healthData.steps.toLocaleString()}</strong>
-                      <span>Steps</span>
-                    </button>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.75rem' }}>
+              New Date
+              <input
+                type="date"
+                value={rescheduleDate}
+                onChange={e => setRescheduleDate(e.target.value)}
+                style={{ display: 'block', width: '100%', marginTop: '0.3rem', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}
+              />
+            </label>
 
-                    <button
-                      type="button"
-                      className={`health-metric ${selectedHealthMetric === 'sleep' ? 'selected' : ''}`}
-                      onClick={() => setSelectedHealthMetric('sleep')}
-                    >
-                      <div className="health-metric-icon">😴</div>
-                      <strong>{healthData.sleepHours} hrs</strong>
-                      <span>Sleep</span>
-                    </button>
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <label style={{ flex: 1, fontSize: '0.85rem', fontWeight: 600 }}>
+                Start Time
+                <input
+                  type="time"
+                  value={rescheduleStartTime}
+                  onChange={e => setRescheduleStartTime(e.target.value)}
+                  style={{ display: 'block', width: '100%', marginTop: '0.3rem', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}
+                />
+              </label>
 
-                    <button
-                      type="button"
-                      className={`health-metric ${selectedHealthMetric === 'exercise' ? 'selected' : ''}`}
-                      onClick={() => setSelectedHealthMetric('exercise')}
-                    >
-                      <div className="health-metric-icon">🏃</div>
-                      <strong>{healthData.exerciseMinutes} min</strong>
-                      <span>Exercise</span>
-                    </button>
-                  </div>
-
-                  {selectedHealthMetric && (
-                    <div className='health-detail'>
-                      {selectedHealthMetric === 'steps' && (
-                        <>
-                          <div className='health-detail-heading'>
-                            <span>🚶</span>
-                            <h3>Steps</h3>
-                          </div>
-
-                          <div className='health-detail-main'>
-                            <strong>{healthData.steps.toLocaleString()}</strong>
-                            <span>today</span>
-                          </div>
-
-                          <div className='health-detail-row'>
-                            <span>Daily Goal</span>
-                            <strong>8000</strong>
-                          </div>
-
-                          <div className='health-detail-row'>
-                            <span>Progress</span>
-                            <strong>{Math.round((healthData.steps / 8000 ) * 100)}%</strong>
-                          </div>
-                        </>
-                      )}
-
-                      {selectedHealthMetric === 'sleep' && (
-                        <>
-                          <div className='health-detail-heading'>
-                            <span>😴</span>
-                            <h3>Sleep</h3>
-                          </div>
-
-                          <div className='health-detail-main'>
-                            <strong>{healthData.sleepHours} hours</strong>
-                            <span>last night's sleep</span>
-                          </div>
-
-                          <div className='health-detail-row'>
-                            <span>Sleep Goal</span>
-                            <strong>8 hours</strong>
-                          </div>
-                        </>
-                      )}
-
-                      {selectedHealthMetric === 'exercise' && (
-                      <>
-                        <div className="health-detail-heading">
-                          <span>🏃</span>
-                          <h3>Exercise</h3>
-                        </div>
-
-                        <div className="health-detail-main">
-                          <strong>{healthData.exerciseMinutes} minutes</strong>
-                          <span>today</span>
-                        </div>
-
-                        <div className="health-detail-row">
-                          <span>Walking</span>
-                          <strong>25 min</strong>
-                        </div>
-
-                        <div className="health-detail-row">
-                          <span>Other activity</span>
-                          <strong>17 min</strong>
-                        </div>
-                      </>
-                    )}
-                    </div>
-                  )}
-
-                  <button
-                    type="button"
-                    className="health-sync-button"
-                    onClick={() => alert('Health data synced successfully!')}
-                  >
-                    <span>🔄</span>
-                    Sync Health Data
-                  </button>
-                </div>
-              </section>
+              <label style={{ flex: 1, fontSize: '0.85rem', fontWeight: 600 }}>
+                End Time
+                <input
+                  type="time"
+                  value={rescheduleEndTime}
+                  onChange={e => setRescheduleEndTime(e.target.value)}
+                  style={{ display: 'block', width: '100%', marginTop: '0.3rem', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}
+                />
+              </label>
             </div>
 
-            <div className='carousel-controls'>
-
-              <button 
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={() => setReschedulingTask(null)}
+                style={{ flex: 1, background: 'var(--border)', color: 'var(--text)', padding: '0.6rem', borderRadius: '8px', border: 'none', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
                 type="button"
                 className='carousel-arrow'
                 onClick={() => {
