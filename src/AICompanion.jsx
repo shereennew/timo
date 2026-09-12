@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { sendAgentMessage } from './aiAgent'
 import { extractText, resizeImage } from './extractText'
 import { summarizeSchedule } from './planning'
@@ -132,6 +132,31 @@ export default function AICompanion(props) {
   const [customPlanFor, setCustomPlanFor] = useState(null)
   const [chosenTaskIds, setChosenTaskIds] = useState({})
   const fileInputRef = useRef(null)
+  const processedPendingRef = useRef(false)
+
+  useEffect(() => {
+  if (messages.length === 0) return
+  const last = messages[messages.length - 1]
+  if (last.pendingFile && !processedPendingRef.current) {
+    processedPendingRef.current = true
+
+    setSelectedFiles(prev => [...prev, last.pendingFile])
+    setInput(prev => prev || `Please help me with this file.`)
+
+    setMessages(prev => {
+      if (last.silent) {
+        // 静默消息：直接删掉，用户看不到
+        return prev.slice(0, -1)
+      }
+      // 非静默消息：保留，并清掉 pendingFile
+      return prev.map((m, i) =>
+        i === prev.length - 1
+          ? { ...m, pendingFile: null }
+          : m
+      )
+    })
+  }
+}, [messages, setMessages])
 
   function handleFileChange(e) {
     const files = Array.from(e.target.files || [])
