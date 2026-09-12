@@ -5,9 +5,9 @@ import BottomNav from './BottomNav'
 import AICompanion from './AICompanion'
 import Profile from './Profile'
 import Planner from './Planner'
-import { GoogleGenAI } from '@google/genai';
 
 import { dateKey, parseDate, validDate, tasksForDay } from './planning'
+import { analyzeFileWithAI, suggestAIAdjustment, getDailyInsight } from './aiAgent';
 
 const categories = [
   { name: 'Academic', detail: 'Classes & assignment', points: 5, color: 'var(--chart-1)', icon: 'A' },
@@ -36,95 +36,6 @@ const themes = {
   green: { label: 'Green', color: '#c5e4cd' },
 }
 
-async function suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, skippedTaskIds = []) {
-  if (selectedDate < today) return null
-
-  const currentTasks = tasksForDay(tasks, selectedDate)
-  const loads = categories.map(cat => {
-    const matching = currentTasks.filter(
-      task => task.category === cat.name && !task.done
-    )
-
-    return {
-      ...cat,
-      points: matching.reduce(
-        (sum, task) => sum + Number(task.points),
-        0
-      ),
-      detail: `${matching.length} ${matching.length === 1 ? 'task' : 'tasks'} planned`,
-    }
-  })
-
-  const totalLoad = loads.reduce(
-    (total, load) => total + load.points,
-    0
-  )
-
-  if (totalLoad <= dailyCapacity) return null
-
-  const eligibleTasks = currentTasks.filter(t => !skippedTaskIds.includes(t.id))
-  if (eligibleTasks.length === 0) return null
-
-  const upcomingContext = []
-  for (let i = 1; i <= 7; i++) {
-    const d = parseDate(selectedDate)
-    d.setDate(d.getDate() + i)
-    const dKey = dateKey(d)
-    const dTasks = tasksForDay(tasks, dKey)
-    const dLoad = dTasks.reduce((sum, task) => sum + Number(task.points), 0)
-    upcomingContext.push({ date: dKey, load: dLoad, capacity: dailyCapacity })
-  }
-
-  try {
-    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY })
-
-    const prompt = `You are Timo, an empathetic AI productivity companion. 
-    The user is overloaded on ${selectedDate}. 
-    Available tasks to choose from on this day: ${JSON.stringify(eligibleTasks)}
-    Total load: ${totalLoad} points. Daily capacity limit: ${dailyCapacity} points.
-    Upcoming available days load profile over next 7 days: ${JSON.stringify(upcomingContext)}
-
-    Choose ONE flexible task from the available tasks list to move to one of the upcoming days where it won't cause an overload.
-    Return ONLY a valid JSON object with:
-    - "taskId": string (the id of the task to move)
-    - "destinationDate": string (YYYY-MM-DD format of the target day)
-    - "reason": string (a short friendly sentence explaining why this helps)`
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash-lite',
-      contents: [prompt],
-    })
-
-    const rawText = response.text.trim()
-    const jsonString = rawText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '')
-    const result = JSON.parse(jsonString)
-
-    const candidate = currentTasks.find(t => t.id === result.taskId)
-    if (!candidate) return null
-
-    const destination = result.destinationDate
-    const destinationTasks = tasksForDay(tasks, destination)
-    const destinationBefore = destinationTasks.reduce((sum, task) => sum + Number(task.points), 0)
-    const destinationAfter = destinationBefore + Number(candidate.points)
-
-    const remainingTasks = currentTasks.filter(task => task.id !== candidate.id)
-    const sourceAfter = remainingTasks.reduce((sum, task) => sum + Number(task.points), 0)
-
-    return {
-      task: candidate,
-      destination,
-      sourceBefore: totalLoad,
-      sourceAfter,
-      destinationBefore,
-      destinationAfter,
-      remaining: Math.max(0, sourceAfter - dailyCapacity),
-      aiReason: result.reason
-    }
-  } catch (error) {
-    console.error("Gemini suggestion error, falling back:", error)
-    return null
-  }
-}
 
 function App() {
   const [page, setPage] = useState('planner')
@@ -156,6 +67,16 @@ function App() {
   }, [dailyMoods])
   const [skippedTaskIds, setSkippedTaskIds] = useState([])
   const [companionInitialMessage, setCompanionInitialMessage] = useState('')
+
+  const [companionMessages, setCompanionMessages] = useState([
+    { role: 'assistant', content: "Hey there! 🌿 I'm Timo. What are we working on today? Feel free to drop a question, paste some text, or just tell me what's on your mind!" }
+  ])
+
+
+  const [reschedulingTask, setReschedulingTask] = useState(null)
+  const [rescheduleDate, setRescheduleDate] = useState(selectedDate)
+  const [rescheduleStartTime, setRescheduleStartTime] = useState('09:00')
+  const [rescheduleEndTime, setRescheduleEndTime] = useState('10:00')
 
   const dailyCapacity =
     moods.find(m => m.label === selectedMood)?.points || 8
@@ -275,14 +196,18 @@ function App() {
   const dayTasks = tasksForDay(tasks, selectedDate)
 
   // Energy calculations
-  const plannedPoints = dayTasks.reduce((sum, t) => sum + Number(t.points), 0)
+  const plannedPoints = dayTasks.reduce((sum, t) => sum + Number(t.points || 0), 0)
   const completedPoints = dayTasks
     .filter(t => t.done)
-    .reduce((sum, t) => sum + Number(t.points), 0)
+    .reduce((sum, t) => sum + Number(t.points || 0), 0)
 
-  const remainingEnergy = Math.max(0, dailyCapacity - plannedPoints + completedPoints)
+  const uncompletedPoints = dayTasks
+    .filter(t => !t.done)
+    .reduce((sum, t) => sum + Number(t.points || 0), 0)
+
+  const remainingEnergy = Math.max(0, dailyCapacity - uncompletedPoints)
   const fillPercentage = Math.min(100, (remainingEnergy / dailyCapacity) * 100)
-  const isOverloaded = plannedPoints > dailyCapacity
+  const isOverloaded = uncompletedPoints > dailyCapacity
   const barColor = isOverloaded ? '#e53e3e' : fillPercentage < 25 ? '#dd6b20' : '#28a745'
 
   const [isAnalyzingFile, setIsAnalyzingFile] = useState(false)
@@ -297,8 +222,6 @@ function App() {
     setMessage(`Scanning and analyzing ${file.name} with Gemini...`)
 
     try {
-      const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY })
-
       const filePart = await new Promise((resolve, reject) => {
         const reader = new FileReader()
         reader.onloadend = () => {
@@ -313,17 +236,7 @@ function App() {
         reader.readAsDataURL(file)
       })
 
-      const prompt = `Analyze this uploaded assignment document, syllabus, image, or notes sheet. Extract any stated submission deadline or due date (format strictly as YYYY-MM-DD if found, otherwise return empty string ""), and break the content down into 2 to 4 manageable micro-tasks. 
-      Return ONLY a valid JSON object with fields: "deadline" (string) and "tasks" (array of objects with "name" (string) and "points" (number: 1, 2, or 3)).`
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash-lite',
-        contents: [filePart, prompt],
-      })
-
-      const rawText = response.text.trim()
-      const jsonString = rawText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '')
-      const parsedData = JSON.parse(jsonString)
+      const parsedData = await analyzeFileWithAI(filePart, category, selectedDate)
 
       const breakdown = parsedData.tasks || []
       const extractedDeadline = parsedData.deadline ? parsedData.deadline : selectedDate
@@ -423,7 +336,26 @@ function App() {
       setMessage('Choose a planned date on or before the deadline.')
       return
     }
+
+    // Check for time overlaps on the same day
+    const conflictingTask = tasks.find(task => {
+      if (task.date !== selectedDate) return false
+      if (editingId && task.id === editingId) return false // Skip current task if editing
+
+      const existingStart = task.startTime || '00:00'
+      const existingEnd = task.endTime || '23:59'
+
+      // Overlap condition: (StartA < EndB) && (EndA > StartB)
+      return startTime < existingEnd && endTime > existingStart
+    })
+
+    if (conflictingTask) {
+      setMessage(`Time conflict! This overlaps with "${conflictingTask.name}" (${conflictingTask.startTime} - ${conflictingTask.endTime}).`)
+      return
+    }
+
     const changes = { name, category, date: selectedDate, points: Number(effort), startTime, endTime, deadline, fixed }
+
     saveTasks(editingId
       ? tasks.map(task => task.id === editingId ? { ...task, ...changes } : task)
       : [...tasks, { id: crypto.randomUUID(), ...changes, done: false }])
@@ -437,7 +369,8 @@ function App() {
     setFixed(false)
     setMessage(`${name} ${wasEditing ? 'updated' : 'added'}.`)
 
-    navigate('dashboard')
+
+    navigate('planner')
   }
 
   const loads = categories.map(cat => {
@@ -518,7 +451,7 @@ function App() {
     setSkippedTaskIds(nextSkipped)
 
     setLoadingSuggestion(true)
-    const res = await suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, nextSkipped)
+    const res = await suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, nextSkipped, categories, tasksForDay, parseDate, dateKey)
     setAiSuggestion(res)
     setLoadingSuggestion(false)
   }
@@ -531,7 +464,6 @@ function App() {
   })
 
   const [message, setMessage] = useState('')
-
   const [aiRecommendation, setAiRecommendation] = useState(null)
   const [showFlowchartWarning, setShowFlowchartWarning] = useState(false)
 
@@ -542,17 +474,7 @@ function App() {
 
       if (currentOverload > 0) {
         try {
-          const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY })
-          const prompt = `You are Timo, an empathetic AI productivity companion. 
-The user's mood is "${selectedMood}" and they are overloaded today with ${currentLoad} points against a capacity of ${dailyCapacity} points. Their tasks are: ${JSON.stringify(dayTasks.map(t => t.name))}.
-Give a short, warm, comforting insight (1-2 sentences max) and explicitly recommend a quick, refreshing break activity (such as stepping out for a walk, grabbing a warm coffee, doing a 5-minute breathing exercise, or listening to a favorite song) to help them reset. Make it a fresh perspective.`
-
-          const response = await ai.models.generateContent({
-            model: 'gemini-3.5-flash-lite',
-            contents: [prompt],
-          })
-
-          const text = response.text.trim()
+          const text = await getDailyInsight(selectedMood, dayTasks, dailyCapacity)
           setAiRecommendation(text)
           setShowFlowchartWarning(true)
         } catch (error) {
@@ -566,7 +488,7 @@ Give a short, warm, comforting insight (1-2 sentences max) and explicitly recomm
     }
 
     fetchAiInsight()
-  }, [selectedDate, dailyCapacity])
+  }, [selectedDate, dailyCapacity, selectedMood, tasks.length]) // Fixed dependency array length mismatch
 
   function saveTasks(nextTasks) {
     setTasks(nextTasks)
@@ -638,7 +560,42 @@ Give a short, warm, comforting insight (1-2 sentences max) and explicitly recomm
         </>
       )}
 
-      {page === 'companion' && <AICompanion initialMessage={companionInitialMessage} />}
+      {page === 'companion' && (
+        <AICompanion
+          initialMessage={companionInitialMessage}
+          messages={companionMessages}
+          setMessages={setCompanionMessages}
+          tasks={tasks}
+          selectedDate={selectedDate}
+          dailyCapacity={dailyCapacity}
+          onTaskCreated={(newTaskData) => {
+            const newTask = {
+              id: crypto.randomUUID(),
+              name: newTaskData.name,
+              category: newTaskData.category || 'Academic',
+              points: Number(newTaskData.points) || 2,
+              date: newTaskData.date || today,
+              startTime: newTaskData.startTime || '09:00',
+              endTime: newTaskData.endTime || '10:00',
+              fixed: false,
+              done: false
+            }
+            saveTasks([...tasks, newTask])
+          }}
+          onTaskDeleted={(taskId) => {
+            saveTasks(tasks.filter(t => t.id !== taskId))
+          }}
+          onTaskUpdated={(updatedTask) => {
+            saveTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t))
+          }}
+          onTaskReschedule={(task) => {
+            setReschedulingTask(task)
+            setRescheduleDate(task.date || selectedDate)
+            setRescheduleStartTime(task.startTime || '09:00')
+            setRescheduleEndTime(task.endTime || '10:00')
+          }}
+        />
+      )}
 
       {page === 'profile' && <Profile theme={theme} setTheme={setTheme} background={background} setBackground={setBackground} />}
 
@@ -828,15 +785,18 @@ Give a short, warm, comforting insight (1-2 sentences max) and explicitly recomm
             navigate('add-task')
           }}
           onToggle={(task) => {
-            saveTasks(tasks.map(t => t.id === task.id ? { ...t, done: !t.done } : t));
-            setMessage(task.done ? 'Marked unfinished.' : 'Task completed.');
+            const updatedTasks = tasks.map(t =>
+              t.id === task.id ? { ...t, done: !t.done } : t
+            )
+            saveTasks(updatedTasks)
+            setMessage(task.done ? 'Marked unfinished.' : 'Task completed.')
           }}
           showSuggestions={showSuggestions}
           setShowSuggestions={async (val) => {
             setShowSuggestions(val)
             if (val && !aiSuggestion) {
               setLoadingSuggestion(true)
-              const res = await suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, skippedTaskIds)
+              const res = await suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, skippedTaskIds, categories, tasksForDay, parseDate, dateKey)
               setAiSuggestion(res)
               setLoadingSuggestion(false)
             }
@@ -860,6 +820,12 @@ Give a short, warm, comforting insight (1-2 sentences max) and explicitly recomm
           onOpenCompanion={() => {
             setCompanionInitialMessage("Hey Timo, I saw your insight about my workload today. Can we talk more about it?")
             navigate('companion')
+          }}
+          onTaskReschedule={(task) => {
+            setReschedulingTask(task)
+            setRescheduleDate(task.date || selectedDate)
+            setRescheduleStartTime(task.startTime || '09:00')
+            setRescheduleEndTime(task.endTime || '10:00')
           }}
         />
       )}
@@ -975,6 +941,118 @@ Give a short, warm, comforting insight (1-2 sentences max) and explicitly recomm
             </button>
           </nav>
         </>
+      )}
+
+      {reschedulingTask && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'rgba(0, 0, 0, 0.4)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem'
+        }}>
+          <div style={{
+            background: 'var(--card-bg, #fff)',
+            padding: '1.5rem',
+            borderRadius: '16px',
+            width: '100%',
+            maxWidth: '400px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+            border: '1px solid var(--border)'
+          }}>
+            <h2 style={{ fontSize: '1.2rem', marginBottom: '0.4rem' }}>Reschedule Task</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '1rem' }}>
+              Choose a new date and time for <strong>{reschedulingTask.name}</strong>.
+            </p>
+
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.75rem' }}>
+              New Date
+              <input
+                type="date"
+                value={rescheduleDate}
+                onChange={e => setRescheduleDate(e.target.value)}
+                style={{ display: 'block', width: '100%', marginTop: '0.3rem', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}
+              />
+            </label>
+
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              <label style={{ flex: 1, fontSize: '0.85rem', fontWeight: 600 }}>
+                Start Time
+                <input
+                  type="time"
+                  value={rescheduleStartTime}
+                  onChange={e => setRescheduleStartTime(e.target.value)}
+                  style={{ display: 'block', width: '100%', marginTop: '0.3rem', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}
+                />
+              </label>
+
+              <label style={{ flex: 1, fontSize: '0.85rem', fontWeight: 600 }}>
+                End Time
+                <input
+                  type="time"
+                  value={rescheduleEndTime}
+                  onChange={e => setRescheduleEndTime(e.target.value)}
+                  style={{ display: 'block', width: '100%', marginTop: '0.3rem', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}
+                />
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={() => setReschedulingTask(null)}
+                style={{ flex: 1, background: 'var(--border)', color: 'var(--text)', padding: '0.6rem', borderRadius: '8px', border: 'none', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => {
+                  if (rescheduleStartTime >= rescheduleEndTime) {
+                    setMessage('End time must be after start time.')
+                    return
+                  }
+
+                  // Check for time overlaps on the target reschedule date
+                  const conflictingTask = tasks.find(task => {
+                    if (task.date !== rescheduleDate) return false
+                    if (task.id === reschedulingTask.id) return false // Skip the task being rescheduled
+
+                    const existingStart = task.startTime || '00:00'
+                    const existingEnd = task.endTime || '23:59'
+
+                    // Overlap condition: (StartA < EndB) && (EndA > StartB)
+                    return rescheduleStartTime < existingEnd && rescheduleEndTime > existingStart
+                  })
+
+                  if (conflictingTask) {
+                    setMessage(`Time conflict! This overlaps with "${conflictingTask.name}" (${conflictingTask.startTime} - ${conflictingTask.endTime}).`)
+                    return
+                  }
+
+                  saveTasks(tasks.map(t => t.id === reschedulingTask.id ? {
+                    ...t,
+                    date: rescheduleDate,
+                    startTime: rescheduleStartTime,
+                    endTime: rescheduleEndTime
+                  } : t))
+                  setMessage(`Rescheduled "${reschedulingTask.name}" successfully!`)
+                  setReschedulingTask(null)
+                }}
+                style={{ flex: 1, padding: '0.6rem', borderRadius: '8px', border: 'none', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <BottomNav page={page} navigate={navigate} />
