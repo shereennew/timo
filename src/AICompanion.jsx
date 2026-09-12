@@ -13,7 +13,6 @@ export default function AICompanion(props) {
   const [pendingConfirmationId, setPendingConfirmationId] = useState(null)
   const fileInputRef = useRef(null)
 
-  // Example inside AICompanion.jsx handleFileUpload
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -37,7 +36,6 @@ export default function AICompanion(props) {
       const updatedMessages = [...messages, userMessage];
       setMessages(updatedMessages);
 
-      // Pass filePart AND file.name here:
       const response = await sendAgentMessage(updatedMessages, filePart, file.name);
 
       if (response.text) {
@@ -88,7 +86,6 @@ export default function AICompanion(props) {
       const allTasks = props.tasks || []
       const targetTask = allTasks.find(t => lowerInput.includes(t.name.toLowerCase()))
 
-      // Append user message to chat history first
       const newHistoryWithUser = [...messages, { role: 'user', content: userMessage }]
       setMessages(newHistoryWithUser)
 
@@ -100,7 +97,6 @@ export default function AICompanion(props) {
         return
       }
 
-      // Check if it's a heavy task (3 points) and we are not already waiting for confirmation of this task
       if (Number(targetTask.points) === 3 && pendingConfirmationId !== targetTask.id) {
         setPendingConfirmationId(targetTask.id)
         setMessages(prev => [
@@ -110,7 +106,6 @@ export default function AICompanion(props) {
         return
       }
 
-      // If it's light/medium or user confirmed the heavy task, delete it
       if (props.onTaskDeleted) {
         props.onTaskDeleted(targetTask.id)
       }
@@ -145,7 +140,6 @@ export default function AICompanion(props) {
       setPendingConfirmationId(null)
       return
     }
-    // ----------------------------------------------------
 
     // --- CHECK FOR RESCHEDULING / MOVING TASKS ---
     if (lowerInput.includes('move') || lowerInput.includes('reschedule')) {
@@ -163,7 +157,6 @@ export default function AICompanion(props) {
         return
       }
 
-      // Simple logic: if they mention "tomorrow", shift the date by 1 day, or default to selectedDate
       const targetDateObj = new Date(props.selectedDate || Date.now())
       if (lowerInput.includes('tomorrow')) {
         targetDateObj.setDate(targetDateObj.getDate() + 1)
@@ -186,8 +179,6 @@ export default function AICompanion(props) {
       return
     }
 
-    // Filter tasks for the selected date or current date
-    // --- SMART DATE PARSING FOR THE AI CONTEXT ---
     let targetDate = props.selectedDate || new Date().toISOString().split('T')[0]
     const lowerUserMsg = userMessage.toLowerCase()
 
@@ -204,7 +195,6 @@ export default function AICompanion(props) {
       ? `[Current Schedule for ${targetDate}: ${dayTasks.map(t => `${t.name} (${t.startTime}-${t.endTime}, ${t.points}pts)`).join(', ')}]`
       : `[Current Schedule for ${targetDate}: No tasks planned yet.]`
 
-    // Append context quietly or include it in the message flow
     const updatedMessages = [
       ...messages,
       { role: 'user', content: `${userMessage} ${scheduleContext}` }
@@ -229,7 +219,39 @@ export default function AICompanion(props) {
 
       if (agentResponse.functionCalls && agentResponse.functionCalls.length > 0) {
         const call = agentResponse.functionCalls[0]
-        if (call.name === 'create_task') {
+
+        if (call.name === 'batch_create_tasks') {
+          const tasksList = call.args.tasks || []
+
+          const sanitizedTasks = tasksList.map(t => ({
+            ...t,
+            date: t.date && t.date >= props.selectedDate ? t.date : props.selectedDate,
+            startTime: t.startTime || '10:00',
+            endTime: t.endTime || '11:00'
+          }))
+
+          if (props.onBatchTasksCreated) {
+            props.onBatchTasksCreated(tasksList)
+          } else if (props.onTaskCreated) {
+            tasksList.forEach(taskArgs => {
+              props.onTaskCreated({
+                name: taskArgs.name,
+                category: taskArgs.category || 'Academic',
+                date: taskArgs.date,
+                points: taskArgs.points || 2,
+                startTime: taskArgs.startTime || '10:00',
+                endTime: taskArgs.endTime || '11:00'
+              })
+            })
+          }
+
+          const taskNamesSummary = tasksList.map(t => `"${t.name}" (${t.date})`).join(', ')
+          setMessages(prev => [
+            ...prev,
+            { role: 'assistant', content: `I've successfully scheduled your tasks across multiple days: ${taskNamesSummary}! 🌿` }
+          ])
+        }
+        else if (call.name === 'create_task') {
           const args = call.args
 
           if (props.onTaskCreated) {

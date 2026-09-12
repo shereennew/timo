@@ -141,10 +141,11 @@ Rules for your answers:
 1. Be direct and concise. 
 2. When the user asks for specific information (like free time, a single task, or a deadline), provide ONLY that information. Do not dump the entire schedule or unrequested details unless explicitly asked.
 3. When a file is attached, acknowledge its filename (e.g., "${fileName}") and provide a clear, bulleted breakdown of the tasks or key points found inside.
-4. Keep your tone encouraging, helpful, and natural.
-5. Be direct and provide only the specific information requested.
-6. When answering or breaking down information, you MUST use clean Markdown bullet points (- or *). 
-7. CRITICAL: Every single bullet point must start on a brand new line. Never put inline asterisks or collapse bullet points into a single paragraph block.
+4. When the user asks to break down a project or task across multiple days (e.g. "break down into 4 days"), you MUST use the batch_create_tasks tool to schedule all items sequentially across consecutive dates instead of just picking the first one.
+5. Keep your tone encouraging, helpful, and natural.
+6. Be direct and provide only the specific information requested.
+7. When answering or breaking down information, you MUST use clean Markdown bullet points (- or *). 
+8. CRITICAL SCHEDULING RULE: When creating tasks or using batch_create_tasks, you MUST check the [Current Schedule for YYYY-MM-DD] provided in the user message. Never schedule a new task in a time slot that is already occupied by an existing task. Always look for gaps in the schedule (free time) to place new tasks cleanly without causing overlapping warnings.
 `;
 
         const contents = [systemInstruction];
@@ -167,19 +168,29 @@ Rules for your answers:
                 tools: [{
                     functionDeclarations: [
                         {
-                            name: 'create_task',
-                            description: 'Create a new task in the user planner schedule.',
+                            name: 'batch_create_tasks',
+                            description: 'Create multiple tasks or split a project breakdown across multiple days in the user schedule.',
                             parameters: {
                                 type: 'OBJECT',
                                 properties: {
-                                    name: { type: 'STRING', description: 'The title of the task' },
-                                    category: { type: 'STRING', enum: ['Academic', 'Work', 'Social'] },
-                                    points: { type: 'NUMBER', description: '1 for light, 2 for medium, 3 for heavy' },
-                                    date: { type: 'STRING', description: 'YYYY-MM-DD format' },
-                                    startTime: { type: 'STRING', description: 'HH:MM format, e.g. 14:00' },
-                                    endTime: { type: 'STRING', description: 'HH:MM format, e.g. 15:00' }
+                                    tasks: {
+                                        type: 'ARRAY',
+                                        description: 'List of tasks to create',
+                                        items: {
+                                            type: 'OBJECT',
+                                            properties: {
+                                                name: { type: 'STRING', description: 'The title of the task' },
+                                                category: { type: 'STRING', enum: ['Academic', 'Work', 'Social'] },
+                                                points: { type: 'NUMBER', description: '1 for light, 2 for medium, 3 for heavy' },
+                                                date: { type: 'STRING', description: 'YYYY-MM-DD format' },
+                                                startTime: { type: 'STRING', description: 'HH:MM format, e.g. 10:00' },
+                                                endTime: { type: 'STRING', description: 'HH:MM format, e.g. 11:00' }
+                                            },
+                                            required: ['name', 'date', 'startTime', 'endTime']
+                                        }
+                                    }
                                 },
-                                required: ['name', 'date', 'startTime', 'endTime']
+                                required: ['tasks']
                             }
                         }
                     ]

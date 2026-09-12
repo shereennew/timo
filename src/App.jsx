@@ -229,65 +229,13 @@ function App() {
     const fileName = params.get('file')
 
     if (fileName) {
-      const breakdownItems = [
-        { name: `Read & review ${fileName}`, points: 2 },
-        { name: `Draft key notes & summary`, points: 2 },
-        { name: `Practice review questions`, points: 1 }
-      ]
-
-      const startDateObj = parseDate(today)
-      let currentTasks = [...tasks]
-
-      const newTasks = breakdownItems.map((item, index) => {
-        const targetDateObj = new Date(startDateObj)
-        targetDateObj.setDate(targetDateObj.getDate() + index)
-        const targetDateKey = dateKey(targetDateObj)
-
-        // Find a truly free hour slot to avoid overlaps
-        let startH = 9 + (index * 2)
-        let conflict = true
-
-        while (conflict && startH < 20) {
-          const formattedStart = `${String(startH).padStart(2, '0')}:00`
-          const formattedEnd = `${String(startH + 1).padStart(2, '0')}:00`
-
-          // Check if this window overlaps with any existing task on this date
-          conflict = currentTasks.some(t => 
-            t.date === targetDateKey && 
-            t.startTime && t.endTime &&
-            !(formattedEnd <= t.startTime || formattedStart >= t.endTime)
-          )
-
-          if (conflict) {
-            startH += 1 // Shift forward by 1 hour until a free slot is found
-          }
-        }
-
-        const formattedStart = `${String(startH).padStart(2, '0')}:00`
-        const formattedEnd = `${String(startH + 1).padStart(2, '0')}:00`
-
-        const newTask = {
-          id: crypto.randomUUID(),
-          name: item.name,
-          category: 'Academic',
-          date: targetDateKey,
-          points: item.points,
-          startTime: formattedStart,
-          endTime: formattedEnd,
-          fixed: false,
-          done: false
-        }
-
-        currentTasks.push(newTask)
-        return newTask
-      })
-
-      saveTasks(currentTasks)
-
       setCompanionMessages(prev => [
         ...prev,
         { role: 'user', content: `Can you help me review this file: ${fileName}?` },
-        { role: 'assistant', content: `✨ I've received "${fileName}" and scheduled your micro-tasks around your existing schedule with zero overlaps!` }
+        { 
+          role: 'assistant', 
+          content: `✨ I've received "${fileName}" from your student portal! Here is a recommended breakdown:\n\n• Read & review ${fileName} (2 pts)\n• Draft key notes & summary (2 pts)\n• Practice review questions (1 pt)\n\nWould you like me to add these to your schedule? Just let me know!` 
+        }
       ])
 
       navigate('companion')
@@ -523,6 +471,22 @@ function App() {
     setShowSuggestions(false)
   }
 
+  const handleBatchTasksCreated = (tasksList) => {
+    const formattedNewTasks = tasksList.map(taskArgs => ({
+      id: crypto.randomUUID(),
+      name: taskArgs.name,
+      category: taskArgs.category || 'Academic',
+      date: taskArgs.date || today,
+      points: Number(taskArgs.points) || 2,
+      startTime: taskArgs.startTime || '10:00',
+      endTime: taskArgs.endTime || '11:00',
+      fixed: false,
+      done: false
+    }))
+
+    saveTasks([...tasks, ...formattedNewTasks])
+  }
+
   function handleAddRelaxBreak(suggestion) {
     if (!suggestion) return;
 
@@ -729,6 +693,7 @@ function App() {
           tasks={tasks}
           selectedDate={selectedDate}
           dailyCapacity={dailyCapacity}
+          onBatchTasksCreated={handleBatchTasksCreated}
           onTaskCreated={(newTaskData) => {
             const newTask = {
               id: crypto.randomUUID(),
@@ -749,6 +714,7 @@ function App() {
           }
         />
       )}
+      
       {page === 'profile' && <Profile theme={theme} setTheme={setTheme} background={background} setBackground={setBackground} />}
 
       {page === 'add-task' && (
