@@ -1,5 +1,72 @@
 import { useState, useRef } from 'react'
 import { sendAgentMessage } from './aiAgent'
+import { extractText, resizeImage } from './extractText'
+
+// ---------- Helpers ----------
+
+function isTaskReasonable(task) {
+  if (!task.title || task.title.length < 8) return false
+  if (!task.points || ![1, 2, 3].includes(task.points)) return false
+
+  const lower = task.title.toLowerCase()
+  const badPatterns = [
+    /^(read|look at|check)\b/i,
+    /^exercise \d+$/i,
+    /\b\d+\s*(min|minutes)\b.*\b(only|just)\b/i,
+  ]
+  if (badPatterns.some(p => p.test(lower))) return false
+
+  return true
+}
+
+function sanitizePlannerOptions(planner) {
+  if (!planner?.plannerOptions) return planner
+
+  planner.plannerOptions = planner.plannerOptions
+    .map(opt => ({
+      ...opt,
+      tasks: (opt.tasks || []).filter(isTaskReasonable)
+    }))
+    .filter(opt => opt.tasks.length > 0)
+
+  return planner
+}
+
+function parsePlannerBlock(rawText) {
+  if (!rawText) return { text: '', planner: null }
+
+  const fence = /```json\s*([\s\S]*?)\s*```/i
+  const match = rawText.match(fence)
+  if (!match) return { text: rawText, planner: null }
+
+  try {
+    let planner = JSON.parse(match[1])
+    planner = sanitizePlannerOptions(planner)
+    if (!planner.plannerOptions?.length) return { text: rawText, planner: null }
+
+    const text = rawText.replace(match[0], '').trim()
+    return { text, planner }
+  } catch {
+    return { text: rawText, planner: null }
+  }
+}
+
+const taskTypeIcon = {
+  setup: '🔧',
+  comprehension: '📖',
+  drafting: '✍️',
+  verification: '✅',
+  submission: '📤',
+  research: '🔍',
+}
+
+const difficultyStyle = {
+  easy:   { bg: '#e1f1e6', color: '#356348' },
+  medium: { bg: '#fff0cc', color: '#765714' },
+  hard:   { bg: '#fce0e5', color: '#84334c' },
+}
+
+// ---------- Component ----------
 
 export default function AICompanion(props) {
   const messages = props.messages || [
@@ -13,62 +80,54 @@ export default function AICompanion(props) {
   const [pendingConfirmationId, setPendingConfirmationId] = useState(null)
   const fileInputRef = useRef(null)
 
-  // Example inside AICompanion.jsx handleFileUpload
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64Data = reader.result.split(',')[1];
-      const filePart = {
-        inlineData: {
-          data: base64Data,
-          mimeType: file.type || 'application/pdf'
-        }
-      };
-
-      const userMessage = {
-        role: 'user',
-        content: userMessageText || '[Attached File]',
-        fileName: currentFile ? currentFile.name : null
-      };
-
-      const updatedMessages = [...messages, userMessage];
-      setMessages(updatedMessages);
-
-      // Pass filePart AND file.name here:
-      const response = await sendAgentMessage(updatedMessages, filePart, file.name);
-
-      if (response.text) {
-        setMessages(prev => [...prev, { role: 'assistant', content: response.text }]);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
   function handleFileChange(e) {
     const file = e.target.files[0]
-    if (file) {
-      setSelectedFile(file)
-    }
+    if (file) setSelectedFile(file)
   }
 
+  async function fileToGenerativePart(file) {
+    const blob = file.type.startsWith('image/')
+      ? await resizeImage(file)
+      : file
 
-  function fileToGenerativePart(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onloadend = () => {
         resolve({
           inlineData: {
             data: reader.result.split(',')[1],
-            mimeType: file.type
+            mimeType: blob.type || file.type
           }
         })
       }
       reader.onerror = reject
-      reader.readAsDataURL(file)
+      reader.readAsDataURL(blob)
     })
+  }
+
+  function handleAddPlannerOption(option, plannerMeta) {
+    if (!props.onTaskCreated) return
+
+    const baseDate = props.selectedDate || new Date().toISOString().split('T')[0]
+
+    option.tasks.forEach(t => {
+      props.onTaskCreated({
+        name: t.title,
+        category: 'Academic',
+        points: t.points || 1,
+        date: baseDate,
+        startTime: '09:00',
+        endTime: '10:00',
+      })
+    })
+
+    setMessages(prev => [
+      ...prev,
+      {
+        role: 'assistant',
+        content: `Done! Added ${option.tasks.length} task${option.tasks.length !== 1 ? 's' : ''} to your Planner using "${option.label}". 🌿`
+      }
+    ])
   }
 
   async function handleSendMessage(e) {
@@ -82,13 +141,12 @@ export default function AICompanion(props) {
     setSelectedFile(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
 
-    // --- CHECK FOR DELETION & HEAVY TASK CONFIRMATION ---
     const lowerInput = userMessage.toLowerCase()
+
     if (lowerInput.includes('remove') || lowerInput.includes('delete')) {
       const allTasks = props.tasks || []
       const targetTask = allTasks.find(t => lowerInput.includes(t.name.toLowerCase()))
 
-      // Append user message to chat history first
       const newHistoryWithUser = [...messages, { role: 'user', content: userMessage }]
       setMessages(newHistoryWithUser)
 
@@ -100,7 +158,6 @@ export default function AICompanion(props) {
         return
       }
 
-      // Check if it's a heavy task (3 points) and we are not already waiting for confirmation of this task
       if (Number(targetTask.points) === 3 && pendingConfirmationId !== targetTask.id) {
         setPendingConfirmationId(targetTask.id)
         setMessages(prev => [
@@ -110,10 +167,7 @@ export default function AICompanion(props) {
         return
       }
 
-      // If it's light/medium or user confirmed the heavy task, delete it
-      if (props.onTaskDeleted) {
-        props.onTaskDeleted(targetTask.id)
-      }
+      if (props.onTaskDeleted) props.onTaskDeleted(targetTask.id)
       setPendingConfirmationId(null)
       setMessages(prev => [
         ...prev,
@@ -122,7 +176,6 @@ export default function AICompanion(props) {
       return
     }
 
-    // --- CHECK IF USER IS CONFIRMING A PENDING HEAVY TASK DELETION ---
     if (pendingConfirmationId && (lowerInput === 'yes' || lowerInput === 'yeah' || lowerInput === 'sure' || lowerInput === 'confirm')) {
       const allTasks = props.tasks || []
       const targetTask = allTasks.find(t => t.id === pendingConfirmationId)
@@ -145,9 +198,7 @@ export default function AICompanion(props) {
       setPendingConfirmationId(null)
       return
     }
-    // ----------------------------------------------------
 
-    // --- CHECK FOR RESCHEDULING / MOVING TASKS ---
     if (lowerInput.includes('move') || lowerInput.includes('reschedule')) {
       const allTasks = props.tasks || []
       const targetTask = allTasks.find(t => lowerInput.includes(t.name.toLowerCase()))
@@ -163,7 +214,6 @@ export default function AICompanion(props) {
         return
       }
 
-      // Simple logic: if they mention "tomorrow", shift the date by 1 day, or default to selectedDate
       const targetDateObj = new Date(props.selectedDate || Date.now())
       if (lowerInput.includes('tomorrow')) {
         targetDateObj.setDate(targetDateObj.getDate() + 1)
@@ -175,9 +225,7 @@ export default function AICompanion(props) {
         date: newDateKey
       }
 
-      if (props.onTaskUpdated) {
-        props.onTaskUpdated(updatedTask)
-      }
+      if (props.onTaskUpdated) props.onTaskUpdated(updatedTask)
 
       setMessages(prev => [
         ...prev,
@@ -186,8 +234,6 @@ export default function AICompanion(props) {
       return
     }
 
-    // Filter tasks for the selected date or current date
-    // --- SMART DATE PARSING FOR THE AI CONTEXT ---
     let targetDate = props.selectedDate || new Date().toISOString().split('T')[0]
     const lowerUserMsg = userMessage.toLowerCase()
 
@@ -204,7 +250,6 @@ export default function AICompanion(props) {
       ? `[Current Schedule for ${targetDate}: ${dayTasks.map(t => `${t.name} (${t.startTime}-${t.endTime}, ${t.points}pts)`).join(', ')}]`
       : `[Current Schedule for ${targetDate}: No tasks planned yet.]`
 
-    // Append context quietly or include it in the message flow
     const updatedMessages = [
       ...messages,
       { role: 'user', content: `${userMessage} ${scheduleContext}` }
@@ -220,34 +265,62 @@ export default function AICompanion(props) {
     setIsLoading(true)
 
     try {
-      let filePart = null
+      let fileContext = null
+
       if (currentFile) {
-        filePart = await fileToGenerativePart(currentFile)
+        if (currentFile.type.startsWith('image/')) {
+          const filePart = await fileToGenerativePart(currentFile)
+          fileContext = {
+            kind: 'image',
+            fileName: currentFile.name,
+            filePart
+          }
+        } else {
+          const text = await extractText(currentFile)
+
+          if ((!text || text.trim().length < 20) && currentFile.type === 'application/pdf') {
+            const filePart = await fileToGenerativePart(currentFile)
+            fileContext = {
+              kind: 'image',
+              fileName: currentFile.name,
+              filePart
+            }
+          } else {
+            fileContext = {
+              kind: 'text',
+              fileName: currentFile.name,
+              text: text || ''
+            }
+          }
+        }
       }
 
-      const agentResponse = await sendAgentMessage(updatedMessages, filePart, currentFile?.name)
+      const agentResponse = await sendAgentMessage(updatedMessages, fileContext)
 
       if (agentResponse.functionCalls && agentResponse.functionCalls.length > 0) {
         const call = agentResponse.functionCalls[0]
         if (call.name === 'create_task') {
           const args = call.args
-
-          if (props.onTaskCreated) {
-            props.onTaskCreated(args)
-          }
-
+          if (props.onTaskCreated) props.onTaskCreated(args)
           setMessages(prev => [
             ...prev,
             { role: 'assistant', content: `I've added "${args.name}" to your schedule for ${args.date} from ${args.startTime} to ${args.endTime}! 🌿` }
           ])
         }
       } else {
-        const reply = agentResponse.text || "I'm here for you! What should we tackle next?"
-        setMessages(prev => [...prev, { role: 'assistant', content: reply }])
+        const { text, planner } = parsePlannerBlock(agentResponse.text || '')
+        const reply = text || "I'm here for you! What should we tackle next?"
+        setMessages(prev => [
+          ...prev,
+          { role: 'assistant', content: reply, planner }
+        ])
       }
     } catch (error) {
       console.error(error)
-      setMessages(prev => [...prev, { role: 'assistant', content: "My connection wobbled for a second. Let's try that again!" }])
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: `I couldn't read that file. ${error.message}` }
+      ])
     } finally {
       setIsLoading(false)
     }
@@ -300,11 +373,96 @@ export default function AICompanion(props) {
                 </div>
               )}
               <div>{msg.content}</div>
+
+              {msg.planner && (
+                <div style={{
+                  marginTop: '0.75rem',
+                  padding: '0.75rem',
+                  border: '1px solid var(--border)',
+                  borderRadius: '10px',
+                  background: '#fffefa'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
+                    <strong style={{ fontSize: '0.85rem' }}>📋 Add to Planner</strong>
+                    {msg.planner.difficulty && (() => {
+                      const s = difficultyStyle[msg.planner.difficulty] || difficultyStyle.medium
+                      return (
+                        <span style={{
+                          fontSize: '0.7rem',
+                          padding: '0.1rem 0.45rem',
+                          borderRadius: '6px',
+                          background: s.bg,
+                          color: s.color,
+                          fontWeight: 700,
+                          textTransform: 'capitalize'
+                        }}>
+                          {msg.planner.difficulty}
+                        </span>
+                      )
+                    })()}
+                    {msg.planner.totalEffort && (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
+                        · {msg.planner.totalEffort} total
+                      </span>
+                    )}
+                  </div>
+
+                  {msg.planner.plannerOptions?.map(option => (
+                    <div
+                      key={option.id}
+                      style={{
+                        border: '1px solid var(--border)',
+                        borderRadius: '8px',
+                        padding: '0.6rem',
+                        marginBottom: '0.5rem',
+                        background: '#fff'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                        <strong style={{ fontSize: '0.8rem' }}>{option.label}</strong>
+                        <span style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
+                          {option.tasks.length} task{option.tasks.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+
+                      <ul style={{ margin: 0, paddingLeft: '1rem', fontSize: '0.8rem' }}>
+                        {option.tasks.map((t, i) => (
+                          <li key={i} style={{ marginBottom: '0.2rem' }}>
+                            {taskTypeIcon[t.type] || '•'} {t.title}{' '}
+                            <span style={{ color: 'var(--muted)' }}>
+                              ({t.effort}, {t.points} pt{t.points !== 1 ? 's' : ''})
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+
+                      <button
+                        type="button"
+                        onClick={() => handleAddPlannerOption(option, msg.planner)}
+                        style={{
+                          marginTop: '0.5rem',
+                          width: '100%',
+                          padding: '0.4rem 0.7rem',
+                          border: 'none',
+                          borderRadius: '8px',
+                          background: 'var(--accent)',
+                          color: 'var(--accent-dark)',
+                          fontWeight: 600,
+                          fontSize: '0.8rem',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Use this option
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
           {isLoading && (
             <div style={{ alignSelf: 'flex-start', background: 'rgba(255, 255, 255, 0.8)', padding: '0.75rem 1rem', borderRadius: '12px', fontSize: '0.9rem', color: 'var(--muted)' }}>
-              Timo is thinking...
+              Timo is reading your file...
             </div>
           )}
         </div>
@@ -322,6 +480,7 @@ export default function AICompanion(props) {
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
+              accept=".pdf,.docx,.pptx,.txt,.csv,.md,image/*"
               style={{ display: 'none' }}
             />
             <button
