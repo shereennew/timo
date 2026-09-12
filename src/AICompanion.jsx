@@ -187,7 +187,18 @@ export default function AICompanion(props) {
     }
 
     // Filter tasks for the selected date or current date
-    const targetDate = props.selectedDate || new Date().toISOString().split('T')[0]
+    // --- SMART DATE PARSING FOR THE AI CONTEXT ---
+    let targetDate = props.selectedDate || new Date().toISOString().split('T')[0]
+    const lowerUserMsg = userMessage.toLowerCase()
+
+    if (lowerUserMsg.includes('tomorrow')) {
+      const tomorrowObj = new Date(props.selectedDate || Date.now())
+      tomorrowObj.setDate(tomorrowObj.getDate() + 1)
+      targetDate = tomorrowObj.toISOString().split('T')[0]
+    } else if (lowerUserMsg.includes('today')) {
+      targetDate = props.selectedDate || new Date().toISOString().split('T')[0]
+    }
+
     const dayTasks = (props.tasks || []).filter(t => t.date === targetDate)
     const scheduleContext = dayTasks.length > 0
       ? `[Current Schedule for ${targetDate}: ${dayTasks.map(t => `${t.name} (${t.startTime}-${t.endTime}, ${t.points}pts)`).join(', ')}]`
