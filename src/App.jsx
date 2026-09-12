@@ -6,8 +6,7 @@ import AICompanion from './AICompanion'
 import Profile from './Profile'
 import Planner from './Planner'
 import { dateKey, parseDate, validDate, tasksForDay } from './planning'
-import { suggestAIAdjustment, getDailyInsight } from './aiAgent'
-import { GoogleGenAI } from '@google/genai'
+import { analyzeFileWithAI, suggestAIAdjustment, getDailyInsight } from './aiAgent'
 //import { getToken, onMessage } from 'firebase/messaging';
 //import { messaging } from './firebase';
 
@@ -44,23 +43,6 @@ const healthData = {
   exerciseMinutes: 42,
 }
 
-// Safe UUID fallback for non-secure contexts / older browsers
-function makeId() {
-  try {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return crypto.randomUUID()
-    }
-  } catch { /* fall through */ }
-  return `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-}
-
-// Format minutes-of-day as HH:MM
-function formatTime(mins) {
-  const h = String(Math.floor(mins / 60) % 24).padStart(2, '0')
-  const m = String(mins % 60).padStart(2, '0')
-  return `${h}:${m}`
-}
-
 function App() {
   const [page, setPage] = useState('planner')
 
@@ -80,20 +62,17 @@ function App() {
 
   const [selectedDate, setSelectedDate] = useState(today)
   const [dailyMoods, setDailyMoods] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('timo-daily-moods') || '{}')
-      return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {}
-    } catch { return {} }
+    try { const saved = JSON.parse(localStorage.getItem('timo-daily-moods') || '{}'); return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {} } catch { return {} }
   })
   const selectedMood = moods.some(m => m.label === dailyMoods[selectedDate]) ? dailyMoods[selectedDate] : 'Okay'
   function setSelectedMood(value) {
     setDailyMoods(previous => ({ ...previous, [selectedDate]: value }))
   }
 
+
   useEffect(() => {
     try { localStorage.setItem('timo-daily-moods', JSON.stringify(dailyMoods)) } catch { /* Keep the current session usable. */ }
   }, [dailyMoods])
-
   const [skippedTaskIds, setSkippedTaskIds] = useState([])
   const [companionInitialMessage, setCompanionInitialMessage] = useState('')
   const [companionMessages, setCompanionMessages] = useState([
@@ -107,8 +86,8 @@ function App() {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
           console.log('Notification permission granted.');
-          const token = await getToken(messaging, {
-            vapidKey: 'YOUR_PUBLIC_VAPID_KEY_FROM_FIREBASE'
+          const token = await getToken(messaging, { 
+            vapidKey: 'YOUR_PUBLIC_VAPID_KEY_FROM_FIREBASE' 
           });
           console.log('FCM Token:', token);
         } else {
@@ -132,8 +111,6 @@ function App() {
 
   const dailyCapacity =
     moods.find(m => m.label === selectedMood)?.points || 8
-
-  const [storageError, setStorageError] = useState(false)
 
   const [tasks, setTasks] = useState(() => {
     try {
@@ -168,17 +145,67 @@ function App() {
       const tomorrow = dateKey(tomorrowDate)
 
       const examples = [
-        { id: 'example-v1-1', name: 'Read chapter 3', category: 'Academic', points: 2, startTime: '09:00', endTime: '10:00', date: today },
-        { id: 'example-v1-2', name: 'Finish assignment draft', category: 'Academic', points: 3, startTime: '10:00', endTime: '12:00', date: today },
-        { id: 'example-v1-3', name: 'Afternoon cafe shift', category: 'Work', points: 3, startTime: '14:00', endTime: '17:00', date: today },
-        { id: 'example-v1-4', name: 'Catch up with a friend', category: 'Social', points: 1, startTime: '18:00', endTime: '19:00', date: today },
-        { id: 'example-v1-5', name: 'Review lecture notes', category: 'Academic', points: 2, startTime: '09:00', endTime: '10:00', date: tomorrow },
-        { id: 'example-v1-6', name: 'Study group catch-up', category: 'Social', points: 2, startTime: '15:00', endTime: '17:00', date: tomorrow },
+        {
+          id: 'example-v1-1',
+          name: 'Read chapter 3',
+          category: 'Academic',
+          points: 2,
+          startTime: '09:00',
+          endTime: '10:00',
+          date: today,
+        },
+        {
+          id: 'example-v1-2',
+          name: 'Finish assignment draft',
+          category: 'Academic',
+          points: 3,
+          startTime: '10:00',
+          endTime: '12:00',
+          date: today,
+        },
+        {
+          id: 'example-v1-3',
+          name: 'Afternoon cafe shift',
+          category: 'Work',
+          points: 3,
+          startTime: '14:00',
+          endTime: '17:00',
+          date: today,
+        },
+        {
+          id: 'example-v1-4',
+          name: 'Catch up with a friend',
+          category: 'Social',
+          points: 1,
+          startTime: '18:00',
+          endTime: '19:00',
+          date: today,
+        },
+        {
+          id: 'example-v1-5',
+          name: 'Review lecture notes',
+          category: 'Academic',
+          points: 2,
+          startTime: '09:00',
+          endTime: '10:00',
+          date: tomorrow,
+        },
+        {
+          id: 'example-v1-6',
+          name: 'Study group catch-up',
+          category: 'Social',
+          points: 2,
+          startTime: '15:00',
+          endTime: '17:00',
+          date: tomorrow,
+        },
       ]
 
       return [
         ...existing,
-        ...examples.filter(example => !existing.some(task => task.id === example.id)),
+        ...examples.filter(
+          example => !existing.some(task => task.id === example.id)
+        ),
       ]
     } catch {
       return []
@@ -188,6 +215,7 @@ function App() {
   useEffect(() => {
     try {
       localStorage.setItem('timo-tasks', JSON.stringify(tasks))
+
       if (tasks.some(task => task.id.startsWith('example-v1-'))) {
         localStorage.setItem('timo-examples-v1', 'added')
       }
@@ -195,17 +223,6 @@ function App() {
       /* Edits report save failures. */
     }
   }, [tasks])
-
-  // Shared task save helper (used by add/edit/remove/toggle and file import)
-  function saveTasks(nextTasks) {
-    setTasks(nextTasks)
-    try {
-      localStorage.setItem('timo-tasks', JSON.stringify(nextTasks))
-      setStorageError(false)
-    } catch {
-      setStorageError(true)
-    }
-  }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -219,7 +236,7 @@ function App() {
       ]
 
       const startDateObj = parseDate(today)
-      const currentTasks = [...tasks]
+      let currentTasks = [...tasks]
 
       const newTasks = breakdownItems.map((item, index) => {
         const targetDateObj = new Date(startDateObj)
@@ -234,20 +251,23 @@ function App() {
           const formattedStart = `${String(startH).padStart(2, '0')}:00`
           const formattedEnd = `${String(startH + 1).padStart(2, '0')}:00`
 
-          conflict = currentTasks.some(t =>
-            t.date === targetDateKey &&
+          // Check if this window overlaps with any existing task on this date
+          conflict = currentTasks.some(t => 
+            t.date === targetDateKey && 
             t.startTime && t.endTime &&
             !(formattedEnd <= t.startTime || formattedStart >= t.endTime)
           )
 
-          if (conflict) startH += 1
+          if (conflict) {
+            startH += 1 // Shift forward by 1 hour until a free slot is found
+          }
         }
 
         const formattedStart = `${String(startH).padStart(2, '0')}:00`
         const formattedEnd = `${String(startH + 1).padStart(2, '0')}:00`
 
         const newTask = {
-          id: makeId(),
+          id: crypto.randomUUID(),
           name: item.name,
           category: 'Academic',
           date: targetDateKey,
@@ -273,7 +293,6 @@ function App() {
       navigate('companion')
       window.history.replaceState({}, document.title, window.location.pathname)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const dayTasks = tasksForDay(tasks, selectedDate)
@@ -284,11 +303,8 @@ function App() {
     .filter(t => t.done)
     .reduce((sum, t) => sum + Number(t.points), 0)
 
-  // Only unfinished work consumes remaining capacity
-  const remainingEnergy = Math.max(0, dailyCapacity - (plannedPoints - completedPoints))
-  const fillPercentage = dailyCapacity > 0
-    ? Math.min(100, (remainingEnergy / dailyCapacity) * 100)
-    : 0
+  const remainingEnergy = Math.max(0, dailyCapacity - plannedPoints + completedPoints)
+  const fillPercentage = Math.min(100, (remainingEnergy / dailyCapacity) * 100)
   const isOverloaded = plannedPoints > dailyCapacity
   const barColor = isOverloaded ? '#e53e3e' : fillPercentage < 25 ? '#dd6b20' : '#28a745'
 
@@ -304,8 +320,6 @@ function App() {
     setMessage(`Scanning and analyzing ${file.name} with Gemini...`)
 
     try {
-      const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY })
-
       const filePart = await new Promise((resolve, reject) => {
         const reader = new FileReader()
         reader.onloadend = () => {
@@ -320,17 +334,7 @@ function App() {
         reader.readAsDataURL(file)
       })
 
-      const prompt = `Analyze this uploaded assignment document, syllabus, image, or notes sheet. Extract any stated submission deadline or due date (format strictly as YYYY-MM-DD if found, otherwise return empty string ""), and break the content down into 2 to 4 manageable micro-tasks.
-      Return ONLY a valid JSON object with fields: "deadline" (string) and "tasks" (array of objects with "name" (string) and "points" (number: 1, 2, or 3)).`
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash-lite',
-        contents: [filePart, prompt],
-      })
-
-      const rawText = response.text.trim()
-      const jsonString = rawText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '')
-      const parsedData = JSON.parse(jsonString)
+      const parsedData = await analyzeFileWithAI(filePart, category, selectedDate)
 
       const breakdown = parsedData.tasks || []
       const extractedDeadline = parsedData.deadline ? parsedData.deadline : selectedDate
@@ -338,7 +342,7 @@ function App() {
       const formattedItems = breakdown.map((item, index) => ({
         id: `sub-${index + 1}`,
         name: item.name,
-        category: 'Academic',
+        category: category,
         points: Number(item.points) || 2,
         selected: true
       }))
@@ -349,9 +353,9 @@ function App() {
     } catch (error) {
       console.error(error)
       setFileBreakdownItems([
-        { id: 'sub-1', name: `Review & outline ${file.name}`, category: 'Academic', points: 2, selected: true },
-        { id: 'sub-2', name: `Complete core work for ${file.name}`, category: 'Academic', points: 3, selected: true },
-        { id: 'sub-3', name: `Final review and submit`, category: 'Academic', points: 1, selected: true }
+        { id: 'sub-1', name: `Review & outline ${file.name}`, category: category, points: 2, selected: true },
+        { id: 'sub-2', name: `Complete core work for ${file.name}`, category: category, points: 3, selected: true },
+        { id: 'sub-3', name: `Final review and submit`, category: category, points: 1, selected: true }
       ])
       setFileDeadline(selectedDate)
       setMessage('Analyzed with fallback template. Review tasks below.')
@@ -378,15 +382,14 @@ function App() {
       targetDateObj.setDate(targetDateObj.getDate() + index)
       const targetDateKey = dateKey(targetDateObj)
 
-      // Spread tasks across 09:00, 11:00, 13:00, 15:00, then wrap
-      const hours = 9 + ((index % 4) * 2)
+      const hours = 9 + (index * 2) % 8
       const formattedStart = `${String(hours).padStart(2, '0')}:00`
       const formattedEnd = `${String(hours + 1).padStart(2, '0')}:00`
 
       return {
-        id: makeId(),
+        id: crypto.randomUUID(),
         name: item.name,
-        category: 'Academic',
+        category: category,
         date: targetDateKey,
         points: item.points,
         startTime: formattedStart,
@@ -434,7 +437,7 @@ function App() {
     const changes = { name, category, date: selectedDate, points: Number(effort), startTime, endTime, deadline, fixed }
     saveTasks(editingId
       ? tasks.map(task => task.id === editingId ? { ...task, ...changes } : task)
-      : [...tasks, { id: makeId(), ...changes, done: false }])
+      : [...tasks, { id: crypto.randomUUID(), ...changes, done: false }])
     const wasEditing = Boolean(editingId)
     setEditingId(null)
 
@@ -449,11 +452,16 @@ function App() {
   }
 
   const loads = categories.map(cat => {
-    const matching = dayTasks.filter(task => task.category === cat.name)
+    const matching = dayTasks.filter(
+      task => task.category === cat.name
+    )
 
     return {
       ...cat,
-      points: matching.reduce((sum, task) => sum + Number(task.points), 0),
+      points: matching.reduce(
+        (sum, task) => sum + Number(task.points),
+        0
+      ),
       detail: `${matching.length} ${matching.length === 1 ? 'task' : 'tasks'} planned`,
     }
   })
@@ -464,7 +472,6 @@ function App() {
   useEffect(() => {
     try { localStorage.setItem('timo-theme', theme) } catch { /* Keep the current session usable. */ }
   }, [theme])
-
   const [background, setBackground] = useState(() => {
     try {
       const saved = localStorage.getItem('timo-background')
@@ -475,7 +482,9 @@ function App() {
   })
 
   useEffect(() => {
-    document.documentElement.style.backgroundColor = backgrounds[background].color
+    document.documentElement.style.backgroundColor =
+      backgrounds[background].color
+
     try {
       localStorage.setItem('timo-background', background)
     } catch {
@@ -487,7 +496,11 @@ function App() {
   const [aiSuggestion, setAiSuggestion] = useState(null)
   const [loadingSuggestion, setLoadingSuggestion] = useState(false)
 
-  const totalLoad = loads.reduce((total, load) => total + load.points, 0)
+  const totalLoad = loads.reduce(
+    (total, load) => total + load.points,
+    0
+  )
+
   const overload = Math.max(0, totalLoad - dailyCapacity)
 
   function acceptSuggestion() {
@@ -511,79 +524,88 @@ function App() {
   }
 
   function handleAddRelaxBreak(suggestion) {
-    if (!suggestion) return
+    if (!suggestion) return;
 
-    const now = new Date()
-    const currentH = String(now.getHours()).padStart(2, '0')
-    const currentM = String(now.getMinutes()).padStart(2, '0')
-    const startTime = `${currentH}:${currentM}`
+    const now = new Date();
+    const currentH = String(now.getHours()).padStart(2, '0');
+    const currentM = String(now.getMinutes()).padStart(2, '0');
+    const startTime = `${currentH}:${currentM}`;
 
-    const [startH, startM] = startTime.split(':').map(Number)
-    const durationMins = suggestion.relaxDurationMinutes || 15
+    const [startH, startM] = startTime.split(':').map(Number);
+    const durationMins = suggestion.relaxDurationMinutes || 15;
 
-    const totalStartMins = startH * 60 + startM
-    const totalEndMins = totalStartMins + durationMins
-    const endTime = formatTime(totalEndMins)
+    const totalStartMins = startH * 60 + startM;
+    const totalEndMins = totalStartMins + durationMins;
+    const endH = String(Math.floor(totalEndMins / 60) % 24).padStart(2, '0');
+    const endM = String(totalEndMins % 60).padStart(2, '0');
+    const endTime = `${endH}:${endM}`;
 
     const newRelaxTask = {
-      id: makeId(),
+      id: crypto.randomUUID(),
       name: `🌿 ${suggestion.relaxTitle}`,
       category: 'Social',
       points: 1,
       date: selectedDate,
-      startTime,
-      endTime,
+      startTime: startTime,
+      endTime: endTime,
       done: false,
       fixed: false
-    }
+    };
 
-    const updatedTasks = []
+    const formatTime = (mins) => {
+      const h = String(Math.floor(mins / 60) % 24).padStart(2, '0');
+      const m = String(mins % 60).padStart(2, '0');
+      return `${h}:${m}`;
+    };
+
+    const updatedTasks = [];
 
     tasks.forEach(t => {
       if (t.date === selectedDate && t.startTime && t.endTime) {
-        const [tStartH, tStartM] = t.startTime.split(':').map(Number)
-        const [tEndH, tEndM] = t.endTime.split(':').map(Number)
-        const tStartMins = tStartH * 60 + tStartM
-        const tEndMins = tEndH * 60 + tEndM
+        const [tStartH, tStartM] = t.startTime.split(':').map(Number);
+        const [tEndH, tEndM] = t.endTime.split(':').map(Number);
+        const tStartMins = tStartH * 60 + tStartM;
+        const tEndMins = tEndH * 60 + tEndM;
 
-        // Break splits this task in two
+        // Check if the break splits right through this task (e.g. 14:00-17:00 and break starts at 14:13)
         if (tStartMins < totalStartMins && tEndMins > totalStartMins) {
-          const firstPoints = Math.ceil(t.points / 2)
-          const secondPoints = t.points - firstPoints   // preserve total
-
+          // Part 1: Before the break
           updatedTasks.push({
             ...t,
             endTime: startTime,
-            points: firstPoints
-          })
+            points: Math.max(1, Math.round(t.points / 2))
+          });
 
+          // Part 2: After the break (pushed back by durationMins)
+          const newPart2Start = totalEndMins;
+          const newPart2End = tEndMins + durationMins;
           updatedTasks.push({
             ...t,
-            id: makeId(),
+            id: crypto.randomUUID(),
             name: `${t.name} (Part 2)`,
-            startTime: formatTime(totalEndMins),
-            endTime: formatTime(tEndMins + durationMins),
-            points: secondPoints
-          })
+            startTime: formatTime(newPart2Start),
+            endTime: formatTime(newPart2End),
+            points: Math.max(1, Math.floor(t.points / 2))
+          });
         } else if (tStartMins >= totalStartMins) {
           // Task starts at or after break: shift forward completely
           updatedTasks.push({
             ...t,
             startTime: formatTime(tStartMins + durationMins),
             endTime: formatTime(tEndMins + durationMins)
-          })
+          });
         } else {
           // Task is completely before the break: leave untouched
-          updatedTasks.push(t)
+          updatedTasks.push(t);
         }
       } else {
-        updatedTasks.push(t)
+        updatedTasks.push(t);
       }
-    })
+    });
 
-    saveTasks([...updatedTasks, newRelaxTask])
-    setShowSuggestions(false)
-    setMessage(`Added break and split overlapping tasks cleanly.`)
+    saveTasks([...updatedTasks, newRelaxTask]);
+    setShowSuggestions(false);
+    setMessage(`Added break and split overlapping tasks cleanly.`);
   }
 
   async function handleSkipSuggestion() {
@@ -609,35 +631,32 @@ function App() {
   const [aiRecommendation, setAiRecommendation] = useState(null)
   const [showFlowchartWarning, setShowFlowchartWarning] = useState(false)
 
-  // Derive a stable signature for the day's tasks so the effect re-runs on content changes
-  const dayTasksSignature = dayTasks
-    .map(t => `${t.id}:${t.points}:${t.done ? 1 : 0}`)
-    .join('|')
-
   useEffect(() => {
-    let cancelled = false
-
     async function fetchAiInsight() {
       const currentLoad = dayTasks.reduce((sum, task) => sum + Number(task.points), 0)
       const currentOverload = Math.max(0, currentLoad - dailyCapacity)
 
       if (currentOverload > 0) {
         const text = await getDailyInsight(selectedMood, dayTasks, dailyCapacity)
-        if (cancelled) return
         setAiRecommendation(text || "Your schedule looks quite packed today. Want to shuffle a few things around so you don't burn out?")
         setShowFlowchartWarning(true)
       } else {
-        if (cancelled) return
-        setAiRecommendation(null)
         setShowFlowchartWarning(false)
       }
     }
 
     fetchAiInsight()
+  }, [selectedDate, dailyCapacity, selectedMood, tasks.length])
 
-    return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, dailyCapacity, selectedMood, dayTasksSignature])
+  function saveTasks(nextTasks) {
+    setTasks(nextTasks)
+
+    try {
+      localStorage.setItem('timo-tasks', JSON.stringify(nextTasks))
+    } catch {
+      // Storage fallback handled silently
+    }
+  }
 
   const [selectedHealthMetric, setSelectedHealthMetric] = useState(null)
   const [dashboardSlide, setDashboardSlide] = useState(0)
@@ -712,7 +731,7 @@ function App() {
           dailyCapacity={dailyCapacity}
           onTaskCreated={(newTaskData) => {
             const newTask = {
-              id: makeId(),
+              id: crypto.randomUUID(),
               name: newTaskData.name,
               category: newTaskData.category || 'Academic',
               points: Number(newTaskData.points) || 2,
@@ -730,15 +749,7 @@ function App() {
           }
         />
       )}
-
-      {page === 'profile' && (
-        <Profile
-          theme={theme}
-          setTheme={setTheme}
-          background={background}
-          setBackground={setBackground}
-        />
-      )}
+      {page === 'profile' && <Profile theme={theme} setTheme={setTheme} background={background} setBackground={setBackground} />}
 
       {page === 'add-task' && (
         <section className="task-section">
@@ -1256,12 +1267,14 @@ function App() {
             </div>
 
             <div className='carousel-controls'>
+
               <button
                 type="button"
                 className='carousel-arrow'
                 onClick={() => {
                   const nextSlide = Math.max(0, dashboardSlide - 1)
                   setDashboardSlide(nextSlide)
+
                   document.getElementById('dashboard-carousel')?.scrollTo({
                     left: nextSlide * document.getElementById('dashboard-carousel').clientWidth,
                     behavior: 'smooth',
@@ -1292,7 +1305,9 @@ function App() {
                   className={`carousel-dot ${dashboardSlide === 1 ? 'active' : ''}`}
                   onClick={() => {
                     const carousel = document.getElementById('dashboard-carousel')
+
                     setDashboardSlide(1)
+
                     carousel?.scrollTo({
                       left: carousel.clientWidth,
                       behavior: 'smooth',
@@ -1308,7 +1323,9 @@ function App() {
                 onClick={() => {
                   const carousel = document.getElementById('dashboard-carousel')
                   const nextSlide = Math.min(1, dashboardSlide + 1)
+
                   setDashboardSlide(nextSlide)
+
                   carousel?.scrollTo({
                     left: nextSlide * carousel.clientWidth,
                     behavior: 'smooth',
@@ -1320,6 +1337,7 @@ function App() {
                 ›
               </button>
             </div>
+
           </section>
 
           <nav
@@ -1337,16 +1355,9 @@ function App() {
               + Add task
             </button>
           </nav>
-
-          {storageError && (
-            <p className="helper" role="alert" style={{ color: '#e53e3e' }}>
-              ⚠️ Couldn't save your changes locally. Your edits will be lost on refresh.
-            </p>
-          )}
         </>
       )}
 
-      {/* BottomNav is now rendered for every page */}
       <BottomNav page={page} navigate={navigate} />
     </main>
   )
