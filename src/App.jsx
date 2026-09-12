@@ -5,9 +5,10 @@ import BottomNav from './BottomNav'
 import AICompanion from './AICompanion'
 import Profile from './Profile'
 import Planner from './Planner'
-
 import { dateKey, parseDate, validDate, tasksForDay } from './planning'
-import { analyzeFileWithAI, suggestAIAdjustment, getDailyInsight } from './aiAgent';
+import { analyzeFileWithAI, suggestAIAdjustment, getDailyInsight } from './aiAgent'
+//import { getToken, onMessage } from 'firebase/messaging';
+//import { messaging } from './firebase';
 
 const categories = [
   { name: 'Academic', detail: 'Classes & assignment', points: 5, color: 'var(--chart-1)', icon: 'A' },
@@ -36,6 +37,11 @@ const themes = {
   green: { label: 'Green', color: '#c5e4cd' },
 }
 
+const healthData = {
+  steps: 6240,
+  sleepHours: 7.2,
+  exerciseMinutes: 42,
+}
 
 function App() {
   const [page, setPage] = useState('planner')
@@ -67,16 +73,39 @@ function App() {
   }, [dailyMoods])
   const [skippedTaskIds, setSkippedTaskIds] = useState([])
   const [companionInitialMessage, setCompanionInitialMessage] = useState('')
-
   const [companionMessages, setCompanionMessages] = useState([
     { role: 'assistant', content: "Hey there! 🌿 I'm Timo. What are we working on today? Feel free to drop a question, paste some text, or just tell me what's on your mind!" }
   ])
 
+  // Request notification permissions and listen for foreground FCM messages
+  /*useEffect(() => {
+    async function requestNotificationPermission() {
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          console.log('Notification permission granted.');
+          const token = await getToken(messaging, { 
+            vapidKey: 'YOUR_PUBLIC_VAPID_KEY_FROM_FIREBASE' 
+          });
+          console.log('FCM Token:', token);
+        } else {
+          console.log('Unable to get permission to notify.');
+        }
+      } catch (error) {
+        console.error('An error occurred while retrieving token. ', error);
+      }
+    }
 
-  const [reschedulingTask, setReschedulingTask] = useState(null)
-  const [rescheduleDate, setRescheduleDate] = useState(selectedDate)
-  const [rescheduleStartTime, setRescheduleStartTime] = useState('09:00')
-  const [rescheduleEndTime, setRescheduleEndTime] = useState('10:00')
+    requestNotificationPermission();
+
+    const unsubscribe = onMessage(messaging, (payload) => {
+      alert(`Reminder: ${payload.notification?.title || 'Notification'} - ${payload.notification?.body || ''}`);
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [])*/
 
   const dailyCapacity =
     moods.find(m => m.label === selectedMood)?.points || 8
@@ -196,18 +225,14 @@ function App() {
   const dayTasks = tasksForDay(tasks, selectedDate)
 
   // Energy calculations
-  const plannedPoints = dayTasks.reduce((sum, t) => sum + Number(t.points || 0), 0)
+  const plannedPoints = dayTasks.reduce((sum, t) => sum + Number(t.points), 0)
   const completedPoints = dayTasks
     .filter(t => t.done)
-    .reduce((sum, t) => sum + Number(t.points || 0), 0)
+    .reduce((sum, t) => sum + Number(t.points), 0)
 
-  const uncompletedPoints = dayTasks
-    .filter(t => !t.done)
-    .reduce((sum, t) => sum + Number(t.points || 0), 0)
-
-  const remainingEnergy = Math.max(0, dailyCapacity - uncompletedPoints)
+  const remainingEnergy = Math.max(0, dailyCapacity - plannedPoints + completedPoints)
   const fillPercentage = Math.min(100, (remainingEnergy / dailyCapacity) * 100)
-  const isOverloaded = uncompletedPoints > dailyCapacity
+  const isOverloaded = plannedPoints > dailyCapacity
   const barColor = isOverloaded ? '#e53e3e' : fillPercentage < 25 ? '#dd6b20' : '#28a745'
 
   const [isAnalyzingFile, setIsAnalyzingFile] = useState(false)
@@ -336,26 +361,7 @@ function App() {
       setMessage('Choose a planned date on or before the deadline.')
       return
     }
-
-    // Check for time overlaps on the same day
-    const conflictingTask = tasks.find(task => {
-      if (task.date !== selectedDate) return false
-      if (editingId && task.id === editingId) return false // Skip current task if editing
-
-      const existingStart = task.startTime || '00:00'
-      const existingEnd = task.endTime || '23:59'
-
-      // Overlap condition: (StartA < EndB) && (EndA > StartB)
-      return startTime < existingEnd && endTime > existingStart
-    })
-
-    if (conflictingTask) {
-      setMessage(`Time conflict! This overlaps with "${conflictingTask.name}" (${conflictingTask.startTime} - ${conflictingTask.endTime}).`)
-      return
-    }
-
     const changes = { name, category, date: selectedDate, points: Number(effort), startTime, endTime, deadline, fixed }
-
     saveTasks(editingId
       ? tasks.map(task => task.id === editingId ? { ...task, ...changes } : task)
       : [...tasks, { id: crypto.randomUUID(), ...changes, done: false }])
@@ -369,8 +375,7 @@ function App() {
     setFixed(false)
     setMessage(`${name} ${wasEditing ? 'updated' : 'added'}.`)
 
-
-    navigate('planner')
+    navigate('dashboard')
   }
 
   const loads = categories.map(cat => {
@@ -445,13 +450,98 @@ function App() {
     setShowSuggestions(false)
   }
 
+  function handleAddRelaxBreak(suggestion) {
+    if (!suggestion) return;
+
+    const now = new Date();
+    const currentH = String(now.getHours()).padStart(2, '0');
+    const currentM = String(now.getMinutes()).padStart(2, '0');
+    const startTime = `${currentH}:${currentM}`;
+
+    const [startH, startM] = startTime.split(':').map(Number);
+    const durationMins = suggestion.relaxDurationMinutes || 15;
+    
+    const totalStartMins = startH * 60 + startM;
+    const totalEndMins = totalStartMins + durationMins;
+    const endH = String(Math.floor(totalEndMins / 60) % 24).padStart(2, '0');
+    const endM = String(totalEndMins % 60).padStart(2, '0');
+    const endTime = `${endH}:${endM}`;
+
+    const newRelaxTask = {
+      id: crypto.randomUUID(),
+      name: `🌿 ${suggestion.relaxTitle}`,
+      category: 'Social',
+      points: 1,
+      date: selectedDate,
+      startTime: startTime,
+      endTime: endTime,
+      done: false,
+      fixed: false
+    };
+
+    const formatTime = (mins) => {
+      const h = String(Math.floor(mins / 60) % 24).padStart(2, '0');
+      const m = String(mins % 60).padStart(2, '0');
+      return `${h}:${m}`;
+    };
+
+    const updatedTasks = [];
+
+    tasks.forEach(t => {
+      if (t.date === selectedDate && t.startTime && t.endTime) {
+        const [tStartH, tStartM] = t.startTime.split(':').map(Number);
+        const [tEndH, tEndM] = t.endTime.split(':').map(Number);
+        const tStartMins = tStartH * 60 + tStartM;
+        const tEndMins = tEndH * 60 + tEndM;
+
+        // Check if the break splits right through this task (e.g. 14:00-17:00 and break starts at 14:13)
+        if (tStartMins < totalStartMins && tEndMins > totalStartMins) {
+          // Part 1: Before the break
+          updatedTasks.push({
+            ...t,
+            endTime: startTime,
+            points: Math.max(1, Math.round(t.points / 2))
+          });
+
+          // Part 2: After the break (pushed back by durationMins)
+          const newPart2Start = totalEndMins;
+          const newPart2End = tEndMins + durationMins;
+          updatedTasks.push({
+            ...t,
+            id: crypto.randomUUID(),
+            name: `${t.name} (Part 2)`,
+            startTime: formatTime(newPart2Start),
+            endTime: formatTime(newPart2End),
+            points: Math.max(1, Math.floor(t.points / 2))
+          });
+        } else if (tStartMins >= totalStartMins) {
+          // Task starts at or after break: shift forward completely
+          updatedTasks.push({
+            ...t,
+            startTime: formatTime(tStartMins + durationMins),
+            endTime: formatTime(tEndMins + durationMins)
+          });
+        } else {
+          // Task is completely before the break: leave untouched
+          updatedTasks.push(t);
+        }
+      } else {
+        updatedTasks.push(t);
+      }
+    });
+
+    saveTasks([...updatedTasks, newRelaxTask]);
+    setShowSuggestions(false);
+    setMessage(`Added break and split overlapping tasks cleanly.`);
+  }
+
   async function handleSkipSuggestion() {
     if (!aiSuggestion) return
     const nextSkipped = [...skippedTaskIds, aiSuggestion.task.id]
     setSkippedTaskIds(nextSkipped)
 
     setLoadingSuggestion(true)
-    const res = await suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, nextSkipped, categories, tasksForDay, parseDate, dateKey)
+    const res = await suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, nextSkipped)
     setAiSuggestion(res)
     setLoadingSuggestion(false)
   }
@@ -464,6 +554,7 @@ function App() {
   })
 
   const [message, setMessage] = useState('')
+
   const [aiRecommendation, setAiRecommendation] = useState(null)
   const [showFlowchartWarning, setShowFlowchartWarning] = useState(false)
 
@@ -473,22 +564,16 @@ function App() {
       const currentOverload = Math.max(0, currentLoad - dailyCapacity)
 
       if (currentOverload > 0) {
-        try {
-          const text = await getDailyInsight(selectedMood, dayTasks, dailyCapacity)
-          setAiRecommendation(text)
-          setShowFlowchartWarning(true)
-        } catch (error) {
-          console.error("Gemini insight error:", error)
-          setAiRecommendation("Your schedule looks quite packed today. Want to shuffle a few things around so you don't burn out?")
-          setShowFlowchartWarning(true)
-        }
+        const text = await getDailyInsight(selectedMood, dayTasks, dailyCapacity)
+        setAiRecommendation(text || "Your schedule looks quite packed today. Want to shuffle a few things around so you don't burn out?")
+        setShowFlowchartWarning(true)
       } else {
         setShowFlowchartWarning(false)
       }
     }
 
     fetchAiInsight()
-  }, [selectedDate, dailyCapacity, selectedMood, tasks.length]) // Fixed dependency array length mismatch
+  }, [selectedDate, dailyCapacity, selectedMood, tasks.length])
 
   function saveTasks(nextTasks) {
     setTasks(nextTasks)
@@ -499,6 +584,9 @@ function App() {
       // Storage fallback handled silently
     }
   }
+
+  const [selectedHealthMetric, setSelectedHealthMetric] = useState(null)
+  const [dashboardSlide, setDashboardSlide] = useState(0)
 
   const totalTasksCount = dayTasks.length
   const completedTasksCount = dayTasks.filter(t => t.done).length
@@ -582,21 +670,12 @@ function App() {
             }
             saveTasks([...tasks, newTask])
           }}
-          onTaskDeleted={(taskId) => {
-            saveTasks(tasks.filter(t => t.id !== taskId))
-          }}
-          onTaskUpdated={(updatedTask) => {
+          onTaskDeleted={(taskId) => saveTasks(tasks.filter(t => t.id !== taskId))}
+          onTaskUpdated={(updatedTask) =>
             saveTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t))
-          }}
-          onTaskReschedule={(task) => {
-            setReschedulingTask(task)
-            setRescheduleDate(task.date || selectedDate)
-            setRescheduleStartTime(task.startTime || '09:00')
-            setRescheduleEndTime(task.endTime || '10:00')
-          }}
+          }
         />
       )}
-
       {page === 'profile' && <Profile theme={theme} setTheme={setTheme} background={background} setBackground={setBackground} />}
 
       {page === 'add-task' && (
@@ -784,19 +863,17 @@ function App() {
             setStartTime('09:00'); setEndTime('10:00'); setDeadline(''); setFixed(false)
             navigate('add-task')
           }}
+          onAddRelaxBreak={handleAddRelaxBreak}
           onToggle={(task) => {
-            const updatedTasks = tasks.map(t =>
-              t.id === task.id ? { ...t, done: !t.done } : t
-            )
-            saveTasks(updatedTasks)
-            setMessage(task.done ? 'Marked unfinished.' : 'Task completed.')
+            saveTasks(tasks.map(t => t.id === task.id ? { ...t, done: !t.done } : t));
+            setMessage(task.done ? 'Marked unfinished.' : 'Task completed.');
           }}
           showSuggestions={showSuggestions}
           setShowSuggestions={async (val) => {
             setShowSuggestions(val)
             if (val && !aiSuggestion) {
               setLoadingSuggestion(true)
-              const res = await suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, skippedTaskIds, categories, tasksForDay, parseDate, dateKey)
+              const res = await suggestAIAdjustment(tasks, selectedDate, dailyCapacity, today, skippedTaskIds)
               setAiSuggestion(res)
               setLoadingSuggestion(false)
             }
@@ -821,12 +898,6 @@ function App() {
             setCompanionInitialMessage("Hey Timo, I saw your insight about my workload today. Can we talk more about it?")
             navigate('companion')
           }}
-          onTaskReschedule={(task) => {
-            setReschedulingTask(task)
-            setRescheduleDate(task.date || selectedDate)
-            setRescheduleStartTime(task.startTime || '09:00')
-            setRescheduleEndTime(task.endTime || '10:00')
-          }}
         />
       )}
 
@@ -842,87 +913,358 @@ function App() {
             className="capacity-card"
             aria-labelledby="capacity-title"
           >
-            <div className="card-heading">
-              <h2 id="capacity-title">Today's Progress</h2>
+            <div className="dashboard-carousel" id="dashboard-carousel">
+              <section className="dashboard-slide">
+                <div className="card-heading">
+                  <h2 id="capacity-title">Today's Progress</h2>
 
-              <span
-                className="capacity-label"
-                style={{
-                  background: 'var(--accent)',
-                  color: 'var(--accent-dark)',
-                  padding: '0.4rem 0.85rem',
-                  borderRadius: '20px',
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                  border: '1px solid var(--accent-dark)',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
-                  letterSpacing: '-0.2px',
-                }}
-              >
-                {completedTasksCount} of {totalTasksCount} completed
-              </span>
-            </div>
-
-            <div
-              className="capacity-donut"
-              style={{ background: completionDonutBackground }}
-              role="img"
-              aria-label={`${completedTasksCount} tasks done out of ${totalTasksCount} total tasks today.`}
-            >
-              <div className="donut-center" aria-hidden="true">
-                <div className="capacity-number">
-                  {completedTasksCount}
-                  <span> / {totalTasksCount}</span>
+                  <span
+                    className="capacity-label"
+                    style={{
+                      background: 'var(--accent)',
+                      color: 'var(--accent-dark)',
+                      padding: '0.4rem 0.85rem',
+                      borderRadius: '20px',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      border: '1px solid var(--accent-dark)',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+                      letterSpacing: '-0.2px',
+                    }}
+                  >
+                    {completedTasksCount} of {totalTasksCount} completed
+                  </span>
                 </div>
 
-                <p className="capacity-caption">
-                  tasks done
-                </p>
-              </div>
-            </div>
-
-            <div className="load-section" style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border, #e2d9ed)', paddingTop: '1rem' }} aria-labelledby="load-title">
-              <div className="section-heading" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
-                <h3 id="load-title" style={{ fontSize: '1rem', margin: 0 }}>Category Breakdown</h3>
-                <span style={{ fontSize: '0.85rem', color: 'var(--muted, #666)' }}>{totalLoad} pts planned</span>
-              </div>
-
-              <div className="load-list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {loads.map(load => (
-                  <div className="load-row" key={load.name} style={{ display: 'flex', alignItems: 'center', background: 'rgba(255,255,255,0.5)', padding: '0.5rem 0.75rem', borderRadius: '8px' }}>
-                    <span
-                      className="category-icon"
-                      style={{
-                        color: 'var(--accent-dark)',
-                        background: load.color,
-                        width: '28px',
-                        height: '28px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '6px',
-                        marginRight: '0.75rem',
-                        fontWeight: 'bold',
-                        fontSize: '0.8rem'
-                      }}
-                      aria-hidden="true"
-                    >
-                      {load.icon}
-                    </span>
-
-                    <div className="load-info" style={{ flex: 1 }}>
-                      <h4 style={{ margin: 0, fontSize: '0.9rem' }}>{load.name}</h4>
-                      <p style={{ margin: 0, fontSize: '0.75rem', color: '#666' }}>{load.detail}</p>
+                <div
+                  className="capacity-donut"
+                  style={{ background: completionDonutBackground }}
+                  role="img"
+                  aria-label={`${completedTasksCount} tasks done out of ${totalTasksCount} total tasks today.`}
+                >
+                  <div className="donut-center" aria-hidden="true">
+                    <div className="capacity-number">
+                      {completedTasksCount}
+                      <span> / {totalTasksCount}</span>
                     </div>
 
-                    <strong style={{ fontSize: '0.9rem' }}>
-                      {load.points}
-                      <span style={{ fontSize: '0.75rem', fontWeight: 'normal' }}> pts</span>
-                    </strong>
+                    <p className="capacity-caption">
+                      tasks done
+                    </p>
                   </div>
-                ))}
-              </div>
+                </div>
+
+                <div
+                  className="load-section"
+                  style={{
+                    marginTop: '1.5rem',
+                    borderTop: '1px solid var(--border, #e2d9ed)',
+                    paddingTop: '1rem'
+                  }}
+                  aria-labelledby="load-title"
+                >
+                  <div
+                    className="section-heading"
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginBottom: '0.75rem'
+                    }}
+                  >
+                    <h3
+                      id="load-title"
+                      style={{ fontSize: '1rem', margin: 0 }}
+                    >
+                      Category Breakdown
+                    </h3>
+
+                    <span
+                      style={{
+                        fontSize: '0.85rem',
+                        color: 'var(--muted, #666)'
+                      }}
+                    >
+                      {totalLoad} pts planned
+                    </span>
+                  </div>
+
+                  <div
+                    className="load-list"
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    {loads.map(load => (
+                      <div
+                        className="load-row"
+                        key={load.name}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          background: 'rgba(255,255,255,0.5)',
+                          padding: '0.5rem 0.75rem',
+                          borderRadius: '8px'
+                        }}
+                      >
+                        <span
+                          className="category-icon"
+                          style={{
+                            color: 'var(--accent-dark)',
+                            background: load.color,
+                            width: '28px',
+                            height: '28px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '6px',
+                            marginRight: '0.75rem',
+                            fontWeight: 'bold',
+                            fontSize: '0.8rem'
+                          }}
+                          aria-hidden="true"
+                        >
+                          {load.icon}
+                        </span>
+
+                        <div
+                          className="load-info"
+                          style={{ flex: 1 }}
+                        >
+                          <h4 style={{ margin: 0, fontSize: '0.9rem' }}>
+                            {load.name}
+                          </h4>
+
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: '0.75rem',
+                              color: '#666'
+                            }}
+                          >
+                            {load.detail}
+                          </p>
+                        </div>
+
+                        <strong style={{ fontSize: '0.9rem' }}>
+                          {load.points}
+                          <span
+                            style={{
+                              fontSize: '0.75rem',
+                              fontWeight: 'normal'
+                            }}
+                          >
+                            {' '}pts
+                          </span>
+                        </strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+
+              <section className="dashboard-slide health-slide">
+                <div
+                  className="health-card"
+                  aria-labelledby="health-title"
+                >
+                  <div className="health-heading">
+                    <div>
+                      <h2 id="health-title">Health Today</h2>
+                      <p>Simulated health data for prototype</p>
+                    </div>
+
+                    <div className="health-icon">💚</div>
+                  </div>
+
+                  <div className="health-metrics">
+                    <button
+                      type="button"
+                      className={`health-metric ${selectedHealthMetric === 'steps' ? 'selected' : ''}`}
+                      onClick={() => setSelectedHealthMetric('steps')}
+                    >
+                      <div className="health-metric-icon">🚶</div>
+                      <strong>{healthData.steps.toLocaleString()}</strong>
+                      <span>Steps</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`health-metric ${selectedHealthMetric === 'sleep' ? 'selected' : ''}`}
+                      onClick={() => setSelectedHealthMetric('sleep')}
+                    >
+                      <div className="health-metric-icon">😴</div>
+                      <strong>{healthData.sleepHours} hrs</strong>
+                      <span>Sleep</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`health-metric ${selectedHealthMetric === 'exercise' ? 'selected' : ''}`}
+                      onClick={() => setSelectedHealthMetric('exercise')}
+                    >
+                      <div className="health-metric-icon">🏃</div>
+                      <strong>{healthData.exerciseMinutes} min</strong>
+                      <span>Exercise</span>
+                    </button>
+                  </div>
+
+                  {selectedHealthMetric && (
+                    <div className='health-detail'>
+                      {selectedHealthMetric === 'steps' && (
+                        <>
+                          <div className='health-detail-heading'>
+                            <span>🚶</span>
+                            <h3>Steps</h3>
+                          </div>
+
+                          <div className='health-detail-main'>
+                            <strong>{healthData.steps.toLocaleString()}</strong>
+                            <span>today</span>
+                          </div>
+
+                          <div className='health-detail-row'>
+                            <span>Daily Goal</span>
+                            <strong>8000</strong>
+                          </div>
+
+                          <div className='health-detail-row'>
+                            <span>Progress</span>
+                            <strong>{Math.round((healthData.steps / 8000) * 100)}%</strong>
+                          </div>
+                        </>
+                      )}
+
+                      {selectedHealthMetric === 'sleep' && (
+                        <>
+                          <div className='health-detail-heading'>
+                            <span>😴</span>
+                            <h3>Sleep</h3>
+                          </div>
+
+                          <div className='health-detail-main'>
+                            <strong>{healthData.sleepHours} hours</strong>
+                            <span>last night's sleep</span>
+                          </div>
+
+                          <div className='health-detail-row'>
+                            <span>Sleep Goal</span>
+                            <strong>8 hours</strong>
+                          </div>
+                        </>
+                      )}
+
+                      {selectedHealthMetric === 'exercise' && (
+                        <>
+                          <div className="health-detail-heading">
+                            <span>🏃</span>
+                            <h3>Exercise</h3>
+                          </div>
+
+                          <div className="health-detail-main">
+                            <strong>{healthData.exerciseMinutes} minutes</strong>
+                            <span>today</span>
+                          </div>
+
+                          <div className="health-detail-row">
+                            <span>Walking</span>
+                            <strong>25 min</strong>
+                          </div>
+
+                          <div className="health-detail-row">
+                            <span>Other activity</span>
+                            <strong>17 min</strong>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    className="health-sync-button"
+                    onClick={() => alert('Health data synced successfully!')}
+                  >
+                    <span>🔄</span>
+                    Sync Health Data
+                  </button>
+                </div>
+              </section>
             </div>
+
+            <div className='carousel-controls'>
+
+              <button
+                type="button"
+                className='carousel-arrow'
+                onClick={() => {
+                  const nextSlide = Math.max(0, dashboardSlide - 1)
+                  setDashboardSlide(nextSlide)
+
+                  document.getElementById('dashboard-carousel')?.scrollTo({
+                    left: nextSlide * document.getElementById('dashboard-carousel').clientWidth,
+                    behavior: 'smooth',
+                  })
+                }}
+                aria-label='Previous card'
+                disabled={dashboardSlide === 0}
+              >
+                ‹
+              </button>
+
+              <div className='carousel-dots' aria-label='Dashboard cards'>
+                <button
+                  type="button"
+                  className={`carousel-dot ${dashboardSlide === 0 ? 'active' : ''}`}
+                  onClick={() => {
+                    setDashboardSlide(0)
+                    document.getElementById('dashboard-carousel')?.scrollTo({
+                      left: 0,
+                      behavior: 'smooth',
+                    })
+                  }}
+                  aria-label="Today's Progress"
+                />
+
+                <button
+                  type="button"
+                  className={`carousel-dot ${dashboardSlide === 1 ? 'active' : ''}`}
+                  onClick={() => {
+                    const carousel = document.getElementById('dashboard-carousel')
+
+                    setDashboardSlide(1)
+
+                    carousel?.scrollTo({
+                      left: carousel.clientWidth,
+                      behavior: 'smooth',
+                    })
+                  }}
+                  aria-label="Health Today"
+                />
+              </div>
+
+              <button
+                type="button"
+                className="carousel-arrow"
+                onClick={() => {
+                  const carousel = document.getElementById('dashboard-carousel')
+                  const nextSlide = Math.min(1, dashboardSlide + 1)
+
+                  setDashboardSlide(nextSlide)
+
+                  carousel?.scrollTo({
+                    left: nextSlide * carousel.clientWidth,
+                    behavior: 'smooth',
+                  })
+                }}
+                aria-label="Next card"
+                disabled={dashboardSlide === 1}
+              >
+                ›
+              </button>
+            </div>
+
           </section>
 
           <nav
@@ -941,118 +1283,6 @@ function App() {
             </button>
           </nav>
         </>
-      )}
-
-      {reschedulingTask && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          backgroundColor: 'rgba(0, 0, 0, 0.4)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '1rem'
-        }}>
-          <div style={{
-            background: 'var(--card-bg, #fff)',
-            padding: '1.5rem',
-            borderRadius: '16px',
-            width: '100%',
-            maxWidth: '400px',
-            boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-            border: '1px solid var(--border)'
-          }}>
-            <h2 style={{ fontSize: '1.2rem', marginBottom: '0.4rem' }}>Reschedule Task</h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '1rem' }}>
-              Choose a new date and time for <strong>{reschedulingTask.name}</strong>.
-            </p>
-
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.75rem' }}>
-              New Date
-              <input
-                type="date"
-                value={rescheduleDate}
-                onChange={e => setRescheduleDate(e.target.value)}
-                style={{ display: 'block', width: '100%', marginTop: '0.3rem', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}
-              />
-            </label>
-
-            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem' }}>
-              <label style={{ flex: 1, fontSize: '0.85rem', fontWeight: 600 }}>
-                Start Time
-                <input
-                  type="time"
-                  value={rescheduleStartTime}
-                  onChange={e => setRescheduleStartTime(e.target.value)}
-                  style={{ display: 'block', width: '100%', marginTop: '0.3rem', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}
-                />
-              </label>
-
-              <label style={{ flex: 1, fontSize: '0.85rem', fontWeight: 600 }}>
-                End Time
-                <input
-                  type="time"
-                  value={rescheduleEndTime}
-                  onChange={e => setRescheduleEndTime(e.target.value)}
-                  style={{ display: 'block', width: '100%', marginTop: '0.3rem', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}
-                />
-              </label>
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                type="button"
-                onClick={() => setReschedulingTask(null)}
-                style={{ flex: 1, background: 'var(--border)', color: 'var(--text)', padding: '0.6rem', borderRadius: '8px', border: 'none', fontWeight: 600, cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="primary-button"
-                onClick={() => {
-                  if (rescheduleStartTime >= rescheduleEndTime) {
-                    setMessage('End time must be after start time.')
-                    return
-                  }
-
-                  // Check for time overlaps on the target reschedule date
-                  const conflictingTask = tasks.find(task => {
-                    if (task.date !== rescheduleDate) return false
-                    if (task.id === reschedulingTask.id) return false // Skip the task being rescheduled
-
-                    const existingStart = task.startTime || '00:00'
-                    const existingEnd = task.endTime || '23:59'
-
-                    // Overlap condition: (StartA < EndB) && (EndA > StartB)
-                    return rescheduleStartTime < existingEnd && rescheduleEndTime > existingStart
-                  })
-
-                  if (conflictingTask) {
-                    setMessage(`Time conflict! This overlaps with "${conflictingTask.name}" (${conflictingTask.startTime} - ${conflictingTask.endTime}).`)
-                    return
-                  }
-
-                  saveTasks(tasks.map(t => t.id === reschedulingTask.id ? {
-                    ...t,
-                    date: rescheduleDate,
-                    startTime: rescheduleStartTime,
-                    endTime: rescheduleEndTime
-                  } : t))
-                  setMessage(`Rescheduled "${reschedulingTask.name}" successfully!`)
-                  setReschedulingTask(null)
-                }}
-                style={{ flex: 1, padding: '0.6rem', borderRadius: '8px', border: 'none', fontWeight: 600, cursor: 'pointer' }}
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       <BottomNav page={page} navigate={navigate} />

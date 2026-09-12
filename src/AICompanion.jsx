@@ -13,6 +13,40 @@ export default function AICompanion(props) {
   const [pendingConfirmationId, setPendingConfirmationId] = useState(null)
   const fileInputRef = useRef(null)
 
+  // Example inside AICompanion.jsx handleFileUpload
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Data = reader.result.split(',')[1];
+      const filePart = {
+        inlineData: {
+          data: base64Data,
+          mimeType: file.type || 'application/pdf'
+        }
+      };
+
+      const userMessage = {
+        role: 'user',
+        content: userMessageText || '[Attached File]',
+        fileName: currentFile ? currentFile.name : null
+      };
+
+      const updatedMessages = [...messages, userMessage];
+      setMessages(updatedMessages);
+
+      // Pass filePart AND file.name here:
+      const response = await sendAgentMessage(updatedMessages, filePart, file.name);
+
+      if (response.text) {
+        setMessages(prev => [...prev, { role: 'assistant', content: response.text }]);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   function handleFileChange(e) {
     const file = e.target.files[0]
     if (file) {
@@ -60,7 +94,7 @@ export default function AICompanion(props) {
 
       if (!targetTask) {
         setMessages(prev => [
-          ...prev, 
+          ...prev,
           { role: 'assistant', content: "I couldn't find a task matching that name in your schedule. Check your planner to make sure it's spelled correctly!" }
         ])
         return
@@ -70,7 +104,7 @@ export default function AICompanion(props) {
       if (Number(targetTask.points) === 3 && pendingConfirmationId !== targetTask.id) {
         setPendingConfirmationId(targetTask.id)
         setMessages(prev => [
-          ...prev, 
+          ...prev,
           { role: 'assistant', content: `"${targetTask.name}" is a heavy 3-point task. Are you sure you want me to remove it? (Reply 'yes' to confirm)` }
         ])
         return
@@ -82,7 +116,7 @@ export default function AICompanion(props) {
       }
       setPendingConfirmationId(null)
       setMessages(prev => [
-        ...prev, 
+        ...prev,
         { role: 'assistant', content: `I've removed "${targetTask.name}" from your schedule! 🌿` }
       ])
       return
@@ -99,12 +133,12 @@ export default function AICompanion(props) {
       if (targetTask && props.onTaskDeleted) {
         props.onTaskDeleted(targetTask.id)
         setMessages(prev => [
-          ...prev, 
+          ...prev,
           { role: 'assistant', content: `Alright, I've gone ahead and removed "${targetTask.name}".` }
         ])
       } else {
         setMessages(prev => [
-          ...prev, 
+          ...prev,
           { role: 'assistant', content: "It looks like that task was already removed or changed." }
         ])
       }
@@ -123,7 +157,7 @@ export default function AICompanion(props) {
 
       if (!targetTask) {
         setMessages(prev => [
-          ...prev, 
+          ...prev,
           { role: 'assistant', content: "I couldn't find a task matching that name to move. Check your spelling!" }
         ])
         return
@@ -146,7 +180,7 @@ export default function AICompanion(props) {
       }
 
       setMessages(prev => [
-        ...prev, 
+        ...prev,
         { role: 'assistant', content: `I've moved "${targetTask.name}" to ${newDateKey}! 🌿` }
       ])
       return
@@ -164,7 +198,14 @@ export default function AICompanion(props) {
       ...messages,
       { role: 'user', content: `${userMessage} ${scheduleContext}` }
     ]
-    setMessages([...messages, { role: 'user', content: userMessage || '[Attached File]' }])
+    setMessages(prev => [
+      ...prev,
+      {
+        role: 'user',
+        content: userMessage || '[Attached File]',
+        fileName: currentFile ? currentFile.name : null
+      }
+    ])
     setIsLoading(true)
 
     try {
@@ -173,7 +214,7 @@ export default function AICompanion(props) {
         filePart = await fileToGenerativePart(currentFile)
       }
 
-      const agentResponse = await sendAgentMessage(updatedMessages, filePart)
+      const agentResponse = await sendAgentMessage(updatedMessages, filePart, currentFile?.name)
 
       if (agentResponse.functionCalls && agentResponse.functionCalls.length > 0) {
         const call = agentResponse.functionCalls[0]
@@ -228,9 +269,26 @@ export default function AICompanion(props) {
               maxWidth: '85%',
               fontSize: '0.9rem',
               boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              lineHeight: 1.4
+              lineHeight: 1.4,
+              whiteSpace: 'pre-wrap'
             }}>
-              {msg.content}
+              {msg.fileName && (
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  background: 'rgba(255, 255, 255, 0.6)',
+                  padding: '0.2rem 0.5rem',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  marginBottom: '0.4rem',
+                  fontWeight: 600,
+                  border: '1px solid rgba(0,0,0,0.05)'
+                }}>
+                  <span>📎</span> {msg.fileName}
+                </div>
+              )}
+              <div>{msg.content}</div>
             </div>
           ))}
           {isLoading && (
