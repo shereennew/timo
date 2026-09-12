@@ -68,6 +68,8 @@ function App() {
   function setSelectedMood(value) {
     setDailyMoods(previous => ({ ...previous, [selectedDate]: value }))
   }
+
+
   useEffect(() => {
     try { localStorage.setItem('timo-daily-moods', JSON.stringify(dailyMoods)) } catch { /* Keep the current session usable. */ }
   }, [dailyMoods])
@@ -221,6 +223,77 @@ function App() {
       /* Edits report save failures. */
     }
   }, [tasks])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const fileName = params.get('file')
+
+    if (fileName) {
+      const breakdownItems = [
+        { name: `Read & review ${fileName}`, points: 2 },
+        { name: `Draft key notes & summary`, points: 2 },
+        { name: `Practice review questions`, points: 1 }
+      ]
+
+      const startDateObj = parseDate(today)
+      let currentTasks = [...tasks]
+
+      const newTasks = breakdownItems.map((item, index) => {
+        const targetDateObj = new Date(startDateObj)
+        targetDateObj.setDate(targetDateObj.getDate() + index)
+        const targetDateKey = dateKey(targetDateObj)
+
+        // Find a truly free hour slot to avoid overlaps
+        let startH = 9 + (index * 2)
+        let conflict = true
+
+        while (conflict && startH < 20) {
+          const formattedStart = `${String(startH).padStart(2, '0')}:00`
+          const formattedEnd = `${String(startH + 1).padStart(2, '0')}:00`
+
+          // Check if this window overlaps with any existing task on this date
+          conflict = currentTasks.some(t => 
+            t.date === targetDateKey && 
+            t.startTime && t.endTime &&
+            !(formattedEnd <= t.startTime || formattedStart >= t.endTime)
+          )
+
+          if (conflict) {
+            startH += 1 // Shift forward by 1 hour until a free slot is found
+          }
+        }
+
+        const formattedStart = `${String(startH).padStart(2, '0')}:00`
+        const formattedEnd = `${String(startH + 1).padStart(2, '0')}:00`
+
+        const newTask = {
+          id: crypto.randomUUID(),
+          name: item.name,
+          category: 'Academic',
+          date: targetDateKey,
+          points: item.points,
+          startTime: formattedStart,
+          endTime: formattedEnd,
+          fixed: false,
+          done: false
+        }
+
+        currentTasks.push(newTask)
+        return newTask
+      })
+
+      saveTasks(currentTasks)
+
+      setCompanionMessages(prev => [
+        ...prev,
+        { role: 'user', content: `Can you help me review this file: ${fileName}?` },
+        { role: 'assistant', content: `✨ I've received "${fileName}" and scheduled your micro-tasks around your existing schedule with zero overlaps!` }
+      ])
+
+      navigate('companion')
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [])
 
   const dayTasks = tasksForDay(tasks, selectedDate)
 
@@ -460,7 +533,7 @@ function App() {
 
     const [startH, startM] = startTime.split(':').map(Number);
     const durationMins = suggestion.relaxDurationMinutes || 15;
-    
+
     const totalStartMins = startH * 60 + startM;
     const totalEndMins = totalStartMins + durationMins;
     const endH = String(Math.floor(totalEndMins / 60) % 24).padStart(2, '0');
