@@ -65,7 +65,7 @@ Users can view their energy capacity, today's task and schedule, workload summar
 <img width="423" height="1591" alt="adaptive planner" src="https://github.com/user-attachments/assets/082018b9-7dba-42b9-a5c3-2325f69de15a" /><br>
 User can add their own tasks in whichever category they prefer and if there are conflicts, the app will ask the user if they'd like to trade a low priority task with another on a different day.  
 
-<img width="491" height="1007" alt="recovery assistant" src="https://github.com/user-attachments/assets/62b03569-32c6-441a-855c-84a8c9789624" /><br>
+<img width="485" height="1321" alt="Recovery Assistant" src="https://github.com/user-attachments/assets/0dc923a5-6c7e-46dd-b952-3ef22d0dee56" /><br>
 The app will track the user's energy capacity and trigger different responses by recommending suitable rest and relaxing activities based on the remaining capacity.  
 
 
