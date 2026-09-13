@@ -72,7 +72,7 @@ Users can view their energy capacity, today's task and schedule, workload summar
 User can add their own tasks in whichever category they prefer and if there are conflicts, the app will ask the user if they'd like to trade a low priority task with another on a different day.  
 
 ### Recovery assistant
-<img width="491" height="1007" alt="recovery assistant" src="https://github.com/user-attachments/assets/62b03569-32c6-441a-855c-84a8c9789624" /><br>
+<img width="485" height="1321" alt="codenection-Recovery Assistant drawio (1)" src="https://github.com/user-attachments/assets/0a2d1f8c-0440-4e37-98d7-cc7ac4b19a44" /><br>
 The app will track the user's energy capacity and trigger different responses by recommending suitable rest and relaxing activities based on the remaining capacity.  
 
 
