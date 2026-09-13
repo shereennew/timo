@@ -95,9 +95,10 @@ We recommend you embed or link 4–8 key screens as images, with a caption on ea
 |---|---|
 | Dynamic Energy Capacity | Instead of only tracking tasks, the app calculates the user's current capacity based on workload, available time, stress check-ins and recovery activities. |
 | Adaptive Workload Intervention | When the user's capacity drops, the app doesn't just send a warning. It automatically reduces or postpones lower-priority tasks while protecting important deadlines. |
-| AI-powered Workload Breakdown | Users can upload their syllabi or assignment documents, and Gemini extracts deadlines and breaks large assignments into smaller, manageable tasks, reducing manual task creation. |
+| AI-powered Workload Breakdown | Users can upload their syllabi or assignment documents, and Timo extracts deadlines and breaks large assignments into smaller, manageable tasks, reducing manual task creation. |
 | Recovery-Aware Planning | Recovery is treated as part of workload management. The app recommends suitable breaks or recovery activities based on the user's current capacity instead of simply encouraging them to work more. |
 | Continuous Recalculation | The user's capacity doesn't simply reset every day. Changes in workload, completed tasks, stress and recovery continuously affect their current capacity and schedule. |
+| AI chatbot | Users can directly talk to Timo chatbot, schedule plans, extract information from uploaded files/document, ask for daily insights, and suggest different study plans and schedule them. | 
 
 Existing productivity apps mainly help users organize what they need to do. Our system goes further by considering what the user can realistically handle and actively adjusting their workload when their capacity decreases.
 
@@ -123,6 +124,8 @@ Existing productivity apps mainly help users organize what they need to do. Our 
 4. Development time - To remain feasible, advanced smartwatch integration will be treated as secondary if time is limited
 
 ## System architecture diagram  
+<img width="692" height="1394" alt="codenection-system architecture drawio (1)" src="https://github.com/user-attachments/assets/f6254b4d-5999-4c23-b0a0-4bde067f8128" />
+
 
 
 ## Build plan & scope  
