@@ -88,6 +88,20 @@ UI Prototype: [ Public Link ]
 Check that it opens in an incognito window. This can be a link to Figma, Canva, Netlify, Vercel or any other board where you showcase your UI. It can be clickable with hyperlinks or simply ordered screenshots.
 We recommend you embed or link 4–8 key screens as images, with a caption on each explaining the interaction
 
+**timö — tiny moments** uses pastel colours, rounded typography and a simple layout to create a calm, approachable planning experience.
+
+The prototype includes:
+- **Daily and weekly planners** for viewing, adding and editing scheduled tasks.
+- **Workload overview and daily check-ins** to compare planned workload with estimated capacity.
+- **AI companion and document upload** to help break assignments into manageable tasks.
+- **Overload support** that suggests schedule adjustments for users to review.
+- **Appearance settings** for personalised colours and backgrounds.
+
+**Main flow:** Check in → Add or generate tasks → Review the timetable → Adjust an overloaded day → Track progress.
+
+[Video Demo](https://youtu.be/k9M8wnI8tVw) · [Presentation Slides](https://www.canva.com/design/DAHU3ykx1O4/pL2p9p5OW3lgPycNHYHdzQ/edit)
+
+Built with React, Vite, JavaScript and CSS. Health data is simulated; capacity values are planning estimates, not medical assessments.
 
 # 4. What Makes It Different
 
