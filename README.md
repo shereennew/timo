@@ -84,10 +84,6 @@ The app will track the user's energy capacity and trigger different responses by
 
 
 # 3. Design & Prototype
-UI Prototype: [ Public Link ]
-Check that it opens in an incognito window. This can be a link to Figma, Canva, Netlify, Vercel or any other board where you showcase your UI. It can be clickable with hyperlinks or simply ordered screenshots.
-We recommend you embed or link 4–8 key screens as images, with a caption on each explaining the interaction
-
 **timö — tiny moments** uses pastel colours, rounded typography and a simple layout to create a calm, approachable planning experience.
 
 The prototype includes:
