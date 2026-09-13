@@ -1,7 +1,7 @@
 Timo by Git Push and Pray  
 Team: Eryne Chuah Ee Wen, Shereen New Jia Ning, Chong Tze Xuen, Chieng Mee Hui  
 Problem Statement: Stress & Workload Manager  
-Video Presentation: [Unlisted Youtube Link]   
+Video Presentation: [Timo Video Presentation](https://youtu.be/k9M8wnI8tVw)   
 Presentation Slides: [Timo Presentation Slides](https://www.canva.com/design/DAHU3ykx1O4/pL2p9p5OW3lgPycNHYHdzQ/edit)
 
 # 1. Project Overview
@@ -47,25 +47,32 @@ Finalized mindmaps of the final features.
 
 
 ### Feature Flowcharts  
+### Login, logout and register
 <img width="1861" height="911" alt="login, logout, signup drawio" src="https://github.com/user-attachments/assets/48c0471a-48a8-4f98-89ca-afe40667be09" /><br>
 Usual login and logout. First-time registration will have to answer a short quiz to determine energy capacity. Energy capacity will be different for every user.
 
+### Smart workload manager
 <img width="597" height="1451" alt="smart workload manager drawio" src="https://github.com/user-attachments/assets/997b7822-55a6-4f70-93c8-4d722025c912" /> <br>
 User can upload documents (e.g. assignment guidelines) to AI and it'll automatically extract details to create a schedule for the user. User can also modify the generated tasks before saving it into the schedule.  
 
+### Popup notification
 <img width="467" height="1362" alt="popup notification" src="https://github.com/user-attachments/assets/f7eab4fb-0d57-45c9-a185-f1d2f536e6f5" /><br>
 Popup notification occurs when the user opens the app for the first time of the day to ask about their energy status for the day. There are notifications for reminders that a task is about to start and a quick check-in if the user is doing the task or would like to postpone said task.  
 
+### Overload intervention
 <img width="862" height="1751" alt="codenection-Overload intervenetion  drawio" src="https://github.com/user-attachments/assets/caf77e76-bc78-43ba-90b6-1b645e0b6806" /><br>
 If the user's workload capacity is overloaded, the app will schedule a rest task. If therer's no available time, the app will instead ask if the user would like to postpone some tasks to rest.  
 
+### Capacity and workload dashboard
 <img width="439" height="928" alt="capacity and workload dashboard" src="https://github.com/user-attachments/assets/532b1794-ceb8-484b-b2de-e57d50bec2cf" /><br>
 Users can view their energy capacity, today's task and schedule, workload summary and categories.  
 
+### Adaptive planner
 <img width="423" height="1591" alt="adaptive planner" src="https://github.com/user-attachments/assets/082018b9-7dba-42b9-a5c3-2325f69de15a" /><br>
 User can add their own tasks in whichever category they prefer and if there are conflicts, the app will ask the user if they'd like to trade a low priority task with another on a different day.  
 
-<img width="485" height="1321" alt="Recovery Assistant" src="https://github.com/user-attachments/assets/0dc923a5-6c7e-46dd-b952-3ef22d0dee56" /><br>
+### Recovery assistant
+<img width="485" height="1321" alt="codenection-Recovery Assistant drawio (1)" src="https://github.com/user-attachments/assets/0a2d1f8c-0440-4e37-98d7-cc7ac4b19a44" /><br>
 The app will track the user's energy capacity and trigger different responses by recommending suitable rest and relaxing activities based on the remaining capacity.  
 
 
@@ -73,14 +80,25 @@ The app will track the user's energy capacity and trigger different responses by
 | Date | Mentor | Feedback Received | What Was Changed |
 | ---- | ------ | ----------------- | ---------------- |
 | 10 September 2026 | Looi Wei En | Focus more on demonstrating the prototype | Changed focus from features to creating a semi-working prototype |
-| 11 September 2026 | Lim Zi Yang | 
+| 11 September 2026 | Lim Zi Yang | Integrate Moodle/student portal and health data, build an AI agent | Created mock health data and built an Ai chatbot. Student portal will be integrated into the app in the future |
 
 
 # 3. Design & Prototype
-UI Prototype: [ Public Link ]
-Check that it opens in an incognito window. This can be a link to Figma, Canva, Netlify, Vercel or any other board where you showcase your UI. It can be clickable with hyperlinks or simply ordered screenshots.
-We recommend you embed or link 4–8 key screens as images, with a caption on each explaining the interaction
+**timö — tiny moments** uses pastel colours, rounded typography and a simple layout to create a calm, approachable planning experience.
+Please add your own Gemini API key into the .env file when using the prototype.
 
+Prototype Link: [Timo Prototype Link](https://shereennew.github.io/timo/)
+
+The prototype includes:
+- **Daily and weekly planners** for viewing, adding and editing scheduled tasks.
+- **Workload overview and daily check-ins** to compare planned workload with estimated capacity.
+- **AI companion and document upload** to help break assignments into manageable tasks.
+- **Overload support** that suggests schedule adjustments for users to review.
+- **Appearance settings** for personalised colours and backgrounds.
+
+**Main flow:** Check in → Add or generate tasks → Review the timetable → Adjust an overloaded day → Track progress.
+
+Built with React, Vite, JavaScript and CSS. Health data is simulated; capacity values are planning estimates, not medical assessments.
 
 # 4. What Makes It Different
 
@@ -88,9 +106,10 @@ We recommend you embed or link 4–8 key screens as images, with a caption on ea
 |---|---|
 | Dynamic Energy Capacity | Instead of only tracking tasks, the app calculates the user's current capacity based on workload, available time, stress check-ins and recovery activities. |
 | Adaptive Workload Intervention | When the user's capacity drops, the app doesn't just send a warning. It automatically reduces or postpones lower-priority tasks while protecting important deadlines. |
-| AI-powered Workload Breakdown | Users can upload their syllabi or assignment documents, and Gemini extracts deadlines and breaks large assignments into smaller, manageable tasks, reducing manual task creation. |
+| AI-powered Workload Breakdown | Users can upload their syllabi or assignment documents, and Timo extracts deadlines and breaks large assignments into smaller, manageable tasks, reducing manual task creation. |
 | Recovery-Aware Planning | Recovery is treated as part of workload management. The app recommends suitable breaks or recovery activities based on the user's current capacity instead of simply encouraging them to work more. |
 | Continuous Recalculation | The user's capacity doesn't simply reset every day. Changes in workload, completed tasks, stress and recovery continuously affect their current capacity and schedule. |
+| AI chatbot | Users can directly talk to Timo chatbot, schedule plans, extract information from uploaded files/document, ask for daily insights, and suggest different study plans and schedule them. | 
 
 Existing productivity apps mainly help users organize what they need to do. Our system goes further by considering what the user can realistically handle and actively adjusting their workload when their capacity decreases.
 
@@ -106,7 +125,8 @@ Existing productivity apps mainly help users organize what they need to do. Our 
 | Authentication | Firebase Authentication | Provides secure user registration and login without building authentication from scratch |
 | AI | Gemini API | Extracts information from uploaded documents, breaks assignments into tasks, provides recovery recommendations, and acts as an AI chatbot when users feel stressed |
 | Notifications | Android WorkManager | Handles scheduled reminders and check-in notifications reliably |
-| Smartwatch | Android Health Connect | Allows the app to access supported health/activity data from compatible devices |
+| Health data | Android Health Connect | Allows the app to access supported health/activity data from compatible devices |
+| Student portal | Moodle | Allows the app to read course information, syllabi, more coursework without much user intervention |
 
 ### Expected Constraints:
 1. Gemini - AI-generated tasks and deadlines may be inaccurate so users can review and edit generatee tasks before saving them
@@ -115,6 +135,8 @@ Existing productivity apps mainly help users organize what they need to do. Our 
 4. Development time - To remain feasible, advanced smartwatch integration will be treated as secondary if time is limited
 
 ## System architecture diagram  
+<img width="692" height="1394" alt="codenection-system architecture drawio (1)" src="https://github.com/user-attachments/assets/f6254b4d-5999-4c23-b0a0-4bde067f8128" />
+
 
 
 ## Build plan & scope  
