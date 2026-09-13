@@ -85,10 +85,9 @@ The app will track the user's energy capacity and trigger different responses by
 
 # 3. Design & Prototype
 **timö — tiny moments** uses pastel colours, rounded typography and a simple layout to create a calm, approachable planning experience.
-Please add your own Gemini API key into the .env file when using the prototype.
+Please add your own Gemini API key into the .env file when using the prototype locally. AI functions are unavailable in the web version.
 
 Prototype Link: [Timo Prototype Link](https://shereennew.github.io/timo/)
-
 The prototype includes:
 - **Daily and weekly planners** for viewing, adding and editing scheduled tasks.
 - **Workload overview and daily check-ins** to compare planned workload with estimated capacity.
