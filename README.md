@@ -1,7 +1,7 @@
 Timo by Git Push and Pray  
 Team: Eryne Chuah Ee Wen, Shereen New Jia Ning, Chong Tze Xuen, Chieng Mee Hui  
 Problem Statement: Stress & Workload Manager  
-Video Presentation: [Unlisted Youtube Link]   
+Video Presentation: [Timo Video Presentation](https://youtu.be/k9M8wnI8tVw)   
 Presentation Slides: [Timo Presentation Slides](https://www.canva.com/design/DAHU3ykx1O4/pL2p9p5OW3lgPycNHYHdzQ/edit)
 
 # 1. Project Overview
@@ -47,24 +47,31 @@ Finalized mindmaps of the final features.
 
 
 ### Feature Flowcharts  
+### Login, logout and register
 <img width="1861" height="911" alt="login, logout, signup drawio" src="https://github.com/user-attachments/assets/48c0471a-48a8-4f98-89ca-afe40667be09" /><br>
 Usual login and logout. First-time registration will have to answer a short quiz to determine energy capacity. Energy capacity will be different for every user.
 
+### Smart workload manager
 <img width="597" height="1451" alt="smart workload manager drawio" src="https://github.com/user-attachments/assets/997b7822-55a6-4f70-93c8-4d722025c912" /> <br>
 User can upload documents (e.g. assignment guidelines) to AI and it'll automatically extract details to create a schedule for the user. User can also modify the generated tasks before saving it into the schedule.  
 
+### Popup notification
 <img width="467" height="1362" alt="popup notification" src="https://github.com/user-attachments/assets/f7eab4fb-0d57-45c9-a185-f1d2f536e6f5" /><br>
 Popup notification occurs when the user opens the app for the first time of the day to ask about their energy status for the day. There are notifications for reminders that a task is about to start and a quick check-in if the user is doing the task or would like to postpone said task.  
 
+### Overload intervention
 <img width="862" height="1751" alt="codenection-Overload intervenetion  drawio" src="https://github.com/user-attachments/assets/caf77e76-bc78-43ba-90b6-1b645e0b6806" /><br>
 If the user's workload capacity is overloaded, the app will schedule a rest task. If therer's no available time, the app will instead ask if the user would like to postpone some tasks to rest.  
 
+### Capacity and workload dashboard
 <img width="439" height="928" alt="capacity and workload dashboard" src="https://github.com/user-attachments/assets/532b1794-ceb8-484b-b2de-e57d50bec2cf" /><br>
 Users can view their energy capacity, today's task and schedule, workload summary and categories.  
 
+### Adaptive planner
 <img width="423" height="1591" alt="adaptive planner" src="https://github.com/user-attachments/assets/082018b9-7dba-42b9-a5c3-2325f69de15a" /><br>
 User can add their own tasks in whichever category they prefer and if there are conflicts, the app will ask the user if they'd like to trade a low priority task with another on a different day.  
 
+### Recovery assistant
 <img width="491" height="1007" alt="recovery assistant" src="https://github.com/user-attachments/assets/62b03569-32c6-441a-855c-84a8c9789624" /><br>
 The app will track the user's energy capacity and trigger different responses by recommending suitable rest and relaxing activities based on the remaining capacity.  
 
@@ -73,7 +80,7 @@ The app will track the user's energy capacity and trigger different responses by
 | Date | Mentor | Feedback Received | What Was Changed |
 | ---- | ------ | ----------------- | ---------------- |
 | 10 September 2026 | Looi Wei En | Focus more on demonstrating the prototype | Changed focus from features to creating a semi-working prototype |
-| 11 September 2026 | Lim Zi Yang | 
+| 11 September 2026 | Lim Zi Yang | Integrate Moodle/student portal and health data, build an AI agent | Created mock health data and built an Ai chatbot. Student portal will be integrated into the app in the future |
 
 
 # 3. Design & Prototype
@@ -106,7 +113,8 @@ Existing productivity apps mainly help users organize what they need to do. Our 
 | Authentication | Firebase Authentication | Provides secure user registration and login without building authentication from scratch |
 | AI | Gemini API | Extracts information from uploaded documents, breaks assignments into tasks, provides recovery recommendations, and acts as an AI chatbot when users feel stressed |
 | Notifications | Android WorkManager | Handles scheduled reminders and check-in notifications reliably |
-| Smartwatch | Android Health Connect | Allows the app to access supported health/activity data from compatible devices |
+| Health data | Android Health Connect | Allows the app to access supported health/activity data from compatible devices |
+| Student portal | Moodle | Allows the app to read course information, syllabi, more coursework without much user intervention |
 
 ### Expected Constraints:
 1. Gemini - AI-generated tasks and deadlines may be inaccurate so users can review and edit generatee tasks before saving them
